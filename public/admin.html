@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Cadet HF-1 Test Results</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@600;700&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: one reading column; summary tiles, then two tables. Single dark look matching the radio. */
+:root{color-scheme:dark;--bg:#0b0d0f;--card:#15191d;--line:#2c333a;--ink:#e6eaee;--muted:#9aa3ac;--amber:#ffb347;--cyan:#46c8e8;--good:#62d49a;--bad:#ff7a5c;
+ --f-head:'Barlow Condensed','Arial Narrow',sans-serif;--f-text:'Atkinson Hyperlegible',system-ui,sans-serif;--f-mono:'Share Tech Mono',ui-monospace,monospace}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-text);padding:24px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+main{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font:700 34px var(--f-head);letter-spacing:3px}
+h2{margin:0 0 8px;font:700 20px var(--f-head);letter-spacing:2px;color:var(--amber)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input{font:16px var(--f-mono);background:#0e1215;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-width:0;flex:1;max-width:360px}
+button{font:700 14px var(--f-head);letter-spacing:1.4px;background:#3a2a12;color:#ffe2b8;border:1px solid var(--amber);border-radius:8px;padding:10px 16px;cursor:pointer}
+button.q{background:#171b1f;color:var(--ink);border-color:var(--line)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+#msg{color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font:700 28px var(--f-head);letter-spacing:1px}
+.tile span{color:var(--muted);font-size:13px}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #222a31;vertical-align:top}
+th{font:700 12px var(--f-head);letter-spacing:1.3px;color:var(--muted);white-space:nowrap}
+td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.p{color:var(--good)}.f{color:var(--bad)}
+td.t{min-width:220px;max-width:420px}
+</style>
+</head>
+<body>
+<main>
+  <h1>CADET HF-1 TEST RESULTS</h1>
+  <form class="row" id="f">
+    <label for="key" style="font:700 13px var(--f-head);letter-spacing:1.4px;color:var(--muted)">ADMIN KEY</label>
+    <input id="key" type="password" autocomplete="current-password">
+    <button type="submit">LOAD</button>
+    <button type="button" class="q" id="csvF">COPY FEEDBACK CSV</button>
+    <button type="button" class="q" id="csvA">COPY RESULTS CSV</button>
+  </form>
+  <p id="msg">Enter the admin key you set in Cloudflare.</p>
+  <section class="tiles" id="tiles" hidden></section>
+  <section id="missions" hidden><h2>MISSION PASS RATES</h2><div class="wrap"><table id="mt"></table></div></section>
+  <section id="fbs" hidden><h2>FEEDBACK</h2><div class="wrap"><table id="ft"></table></div></section>
+  <section id="ats" hidden><h2>MISSION ATTEMPTS</h2><div class="wrap"><table id="at"></table></div></section>
+</main>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const NAMES={foundation40:'Foundation licence check',rit:'Drifting station',beacon:'Find the beacon',data:'Clean data signal'};
+let data=null;
+try{$('#key').value=sessionStorage.getItem('hf1key')||'';}catch(e){}
+$('#f').addEventListener('submit',async e=>{e.preventDefault();const k=$('#key').value.trim();$('#msg').textContent='Loading...';
+ try{const r=await fetch('/api/admin/data',{headers:{authorization:'Bearer '+k}});if(r.status===401){$('#msg').textContent='That key is not right. Check the ADMIN_KEY secret in Cloudflare.';return;}if(!r.ok)throw new Error(r.status);data=await r.json();try{sessionStorage.setItem('hf1key',k);}catch(e){}draw();}
+ catch(err){$('#msg').textContent='Could not load results ('+err.message+'). Check the site is deployed and the database is connected.';}});
+function draw(){const F=data.feedback,A=data.attempts;$('#msg').textContent='Showing the latest '+F.length+' feedback entries and '+A.length+' mission attempts.';
+ const rated=F.filter(x=>x.rating>0);const avg=rated.length?(rated.reduce((s,x)=>s+x.rating,0)/rated.length).toFixed(1):'–';const testers=new Set(A.map(x=>x.tester)).size;
+ $('#tiles').innerHTML=[[F.length,'feedback entries'],[avg,'average rating (1 to 5)'],[A.length,'mission attempts'],[testers,'station IDs seen']].map(t=>'<div class="tile"><b>'+t[0]+'</b><span>'+t[1]+'</span></div>').join('');$('#tiles').hidden=false;
+ const by={};A.forEach(a=>{const m=by[a.mission]||(by[a.mission]={n:0,p:0,lic:0,secs:0,fails:{}});m.n++;if(a.passed)m.p++;if(a.licence_fail)m.lic++;m.secs+=a.secs||0;try{JSON.parse(a.rules||'[]').forEach(r=>{if(!r.ok)m.fails[r.id]=(m.fails[r.id]||0)+1;});}catch(e){}});
+ $('#mt').innerHTML='<tr><th>MISSION</th><th>ATTEMPTS</th><th>PASSED</th><th>LICENCE FAILS</th><th>AVG TIME</th><th>MOST MISSED CHECK</th></tr>'+Object.keys(by).map(k=>{const m=by[k];const top=Object.entries(m.fails).sort((a,b)=>b[1]-a[1])[0];return'<tr><td>'+esc(NAMES[k]||k)+'</td><td class="n">'+m.n+'</td><td class="n">'+Math.round(100*m.p/m.n)+'%</td><td class="n">'+m.lic+'</td><td class="n">'+Math.round(m.secs/m.n/60*10)/10+' min</td><td>'+(top?esc(top[0])+' ('+top[1]+')':'–')+'</td></tr>';}).join('');$('#missions').hidden=!A.length;
+ $('#ft').innerHTML='<tr><th>WHEN</th><th>ROLE</th><th>NAME</th><th>RATING</th><th>WORKED WELL</th><th>CONFUSING OR BROKEN</th><th>SCREEN</th></tr>'+F.map(x=>'<tr><td class="n">'+esc(x.at.slice(0,16).replace('T',' '))+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.name)+'</td><td class="n">'+(x.rating||'–')+'</td><td class="t">'+esc(x.good)+'</td><td class="t">'+esc(x.bad)+'</td><td class="n">'+esc(x.screen)+'</td></tr>').join('');$('#fbs').hidden=!F.length;
+ $('#at').innerHTML='<tr><th>WHEN</th><th>STATION</th><th>MISSION</th><th>RESULT</th><th>POINTS</th><th>TIME</th><th>TXs</th></tr>'+A.map(x=>'<tr><td class="n">'+esc(x.at.slice(0,16).replace('T',' '))+'</td><td class="n">'+esc(x.tester)+'</td><td>'+esc(NAMES[x.mission]||x.mission)+'</td><td class="'+(x.passed?'p':'f')+'">'+(x.passed?'PASS':x.licence_fail?'LICENCE FAIL':'NOT YET')+'</td><td class="n">'+x.points+'/'+x.max_points+'</td><td class="n">'+Math.round(x.secs/6)/10+' min</td><td class="n">'+x.txs+'</td></tr>').join('');$('#ats').hidden=!A.length;}
+function csv(rows){if(!rows||!rows.length)return'';const k=Object.keys(rows[0]);return[k.join(',')].concat(rows.map(r=>k.map(c=>'"'+String(r[c]==null?'':r[c]).replace(/"/g,'""')+'"').join(','))).join('\n');}
+async function copy(t,btn){if(!t){$('#msg').textContent='Load the results first.';return;}try{await navigator.clipboard.writeText(t);btn.textContent='COPIED';setTimeout(()=>btn.textContent=btn.dataset.l,1500);}catch(e){$('#msg').textContent='Copy was blocked by the browser.';}}
+[['#csvF','feedback'],['#csvA','attempts']].forEach(([id,k])=>{const b=$(id);b.dataset.l=b.textContent;b.addEventListener('click',()=>copy(data&&csv(data[k]),b));});
+</script>
+</body>
+</html>
