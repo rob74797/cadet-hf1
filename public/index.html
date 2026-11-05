@@ -250,6 +250,27 @@ button:focus-visible,.knob:focus-visible,#vfo:focus-visible{outline:2px solid va
 .field input,.fbta{-webkit-user-select:text;user-select:text}
 #fbRate button{min-width:44px}
 .tb:disabled{opacity:.5}
+#bBar{position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:15;display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(40,29,12,.97);border:1px solid var(--amber);box-shadow:0 10px 30px rgba(0,0,0,.6)}
+#bBarT{font:600 14px/1.3 var(--f-text);color:var(--amber-soft);max-width:380px}
+.bsec{border-top:1px solid #2a3138;padding-top:10px;margin-top:12px}
+.bsec h3{margin:0 0 8px;font:700 17px var(--f-panel);letter-spacing:1.6px;color:var(--amber)}
+.bsec .sum{font:13px var(--f-lcd);color:var(--lcd-text);margin:2px 0 8px}
+.bgrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px}
+.btab{width:100%;border-collapse:collapse;font:13.5px var(--f-text)}
+.btab th{font:700 11px var(--f-panel);letter-spacing:1.2px;color:var(--muted);text-align:left;padding:4px 6px}
+.btab td{padding:4px 6px;border-top:1px solid #232a31;vertical-align:middle}
+.btab td.v{font:13px var(--f-lcd);color:var(--lcd-text);white-space:nowrap}
+.btab tr.on td{background:rgba(255,179,71,.05)}
+.bin{font:14px var(--f-lcd);background:#0e1215;color:var(--ink);border:1px solid #2e353c;border-radius:6px;padding:5px 7px;width:92px;box-sizing:border-box;-webkit-user-select:text;user-select:text}
+.bin.w{width:100%;font-family:var(--f-text)}
+textarea.bin{resize:vertical}
+.bsel{font:13.5px var(--f-text);background:#0e1215;color:var(--ink);border:1px solid #2e353c;border-radius:6px;padding:6px}
+.blab{display:flex;flex-direction:column;gap:4px;font:700 12px var(--f-panel);letter-spacing:1.3px;color:var(--muted)}
+.warn{font:13.5px/1.4 var(--f-text);color:var(--amber);margin:3px 0}
+.err{font:13.5px/1.4 var(--f-text);color:var(--bad);margin:3px 0}
+.chk{display:flex;align-items:center;gap:8px;font:14px var(--f-text);color:var(--ink)}
+.chk input{width:18px;height:18px;accent-color:var(--amber)}
+.linkb{background:none;border:0;color:var(--cyan);font:13px var(--f-text);cursor:pointer;padding:0;text-decoration:underline}
 @media (prefers-reduced-motion:reduce){#bPower.pulse,#lid,.key.busy{animation:none}}
 </style>
 
@@ -266,6 +287,7 @@ button:focus-visible,.knob:focus-visible,#vfo:focus-visible{outline:2px solid va
     <button id="bSubmit" class="tb accent" type="button">SUBMIT</button>
     <button id="bLog" class="tb" type="button">LOG</button>
     <button id="bFb" class="tb accent" type="button">FEEDBACK</button>
+    <button id="bBuild" class="tb lit" type="button" hidden>BUILDER</button>
     <button id="bFull" class="tb" type="button" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   </header>
 
@@ -365,13 +387,15 @@ button:focus-visible,.knob:focus-visible,#vfo:focus-visible{outline:2px solid va
   <div class="ov" id="ovBrief" hidden><div class="card" style="width:640px">
     <h2 id="brT"></h2>
     <p class="sub" id="brB"></p>
+    <div class="field" id="brCallF"><label for="brCall">YOUR CALLSIGN</label><input id="brCall" autocomplete="off" spellcheck="false" maxlength="10" inputmode="text"></div>
+    <p class="note" id="brErr" style="color:var(--amber)"></p>
     <div class="btnrow"><button class="tb" id="brCancel" type="button">BACK</button><button class="tb accent" id="brGo" type="button">START MISSION</button></div>
   </div></div>
 
   <div class="ov" id="ovAnswer" hidden><div class="card" style="width:560px">
     <h2>YOUR ANSWER</h2>
     <p class="sub" id="ansQ"></p>
-    <div class="field"><label for="ansIn">CALLSIGN</label><input id="ansIn" autocomplete="off" spellcheck="false" maxlength="12"></div>
+    <div class="field"><label for="ansIn">ANSWER</label><input id="ansIn" autocomplete="off" spellcheck="false" maxlength="12"></div>
     <div class="btnrow"><button class="tb" id="ansCancel" type="button">KEEP LISTENING</button><button class="tb accent" id="ansGo" type="button">SUBMIT</button></div>
   </div></div>
 
@@ -379,7 +403,7 @@ button:focus-visible,.knob:focus-visible,#vfo:focus-visible{outline:2px solid va
 
   <div class="ov" id="ovLog" hidden><div class="card">
     <h2>STATION LOG</h2>
-    <div class="field"><label for="stId">YOUR STATION ID</label><input id="stId" autocomplete="off" spellcheck="false" maxlength="10" placeholder="CADET"></div>
+    <div class="field"><label for="stId">YOUR CALLSIGN</label><input id="stId" autocomplete="off" spellcheck="false" maxlength="10" placeholder="e.g. 3Ø6A"></div>
     <div id="logBody"></div>
     <p class="note">Attempts are saved on this device. Sending results to your instructor arrives with GreenVoice sign-in in the next phase.</p>
     <div class="btnrow"><button class="tb" id="logClose" type="button">CLOSE</button></div>
@@ -414,6 +438,24 @@ button:focus-visible,.knob:focus-visible,#vfo:focus-visible{outline:2px solid va
       <p class="note" id="fbMsg"></p>
       <div class="btnrow"><button class="tb" id="fbClose" type="button">CLOSE</button><button class="tb accent" id="fbSend" type="submit">SEND FEEDBACK</button></div>
     </form>
+  </div></div>
+
+  <div id="bBar" hidden><span id="bBarT"></span><button class="tb" id="bbStart" type="button">CAPTURE START</button><button class="tb" id="bbAns" type="button">CAPTURE ANSWER</button><button class="tb accent" id="bbOpen" type="button">OPEN BUILDER</button></div>
+
+  <div class="ov" id="ovBuild" hidden><div class="card" style="width:980px;max-height:520px;display:flex;flex-direction:column;padding:16px 20px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <h2 style="margin:0">MISSION BUILDER</h2>
+      <label for="bKey" class="lbl" style="margin-left:auto">ADMIN KEY</label><input id="bKey" class="bin" type="password" autocomplete="current-password" style="width:170px">
+    </div>
+    <div id="bldBody" style="flex:1;min-height:0;overflow:auto;padding-right:6px"></div>
+    <div class="btnrow" style="margin-top:10px;align-items:center;flex-wrap:wrap">
+      <span id="bMsg" class="note" style="margin:0 auto 0 0;max-width:330px"></span>
+      <button class="tb" id="bNew" type="button">NEW</button>
+      <select id="bLoad" class="bsel" aria-label="Load a saved mission"><option value="">LOAD SAVED…</option></select>
+      <button class="tb" id="bTest" type="button">TEST AS CADET</button>
+      <button class="tb accent" id="bSave" type="button">SAVE MISSION</button>
+      <button class="tb" id="bClose" type="button">CLOSE</button>
+    </div>
   </div></div>
 
   <div class="ov" id="ovPad" hidden><div class="card" style="width:420px">
@@ -505,7 +547,7 @@ for(let i=0;i<n;i++){let v=0;
 /*SHARED-END*/
 
 /* ===== test-site reporting ===== */
-const APP_VERSION='0.4-test';
+const APP_VERSION='0.5-test';
 const ONLINE=/^https?:$/.test(location.protocol)&&!/claude\.ai|claudeusercontent/.test(location.hostname);
 function send(path,body){if(!ONLINE)return Promise.reject(new Error('offline'));return fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
 /* ===== recorded speech clips (I/Q at 6 kHz, companded int8) ===== */
@@ -548,7 +590,7 @@ const ST={
  '28':[{id:'l1',type:'ssb',sb:'U',f:28500000,dbm:-100,clip:'cad',seed:151,off:6}]};
 
 /* ===== missions (the question format a super admin will write) ===== */
-const MISSIONS=[
+const BUILTIN=[
  {id:'free',title:'Free play',brief:'Explore the radio. Nothing is scored. Lift the lid to see inside.',start:{}},
  {id:'foundation40',title:'Foundation licence check',time:'5 min',
   brief:'You hold a Foundation licence. Set this radio up for a voice contact on 40 m that complies with your licence, then make a short test transmission (hold PTT for a few seconds). The radio has been left set up wrong.',
@@ -585,6 +627,8 @@ const MISSIONS=[
    {id:'seg',kind:'practice',points:2,check:'txInside',ranges:[[7000000,7050000]],ok:'In the non-voice part of 40 m.',no:'Data belongs below 7.050 MHz. You transmitted at {edge}.'},
    {id:'alc',kind:'practice',points:3,check:'txMax',field:'alc',max:0.001,ok:'ALC stayed at zero, so the signal stayed clean and narrow.',no:'The ALC moved. On data that widens your signal and the far station cannot decode it.'}]}];
 
+let MISSIONS=BUILTIN.slice();
+function loadMissions(){if(!ONLINE)return;fetch('/api/missions').then(r=>r.ok?r.json():null).then(d=>{if(!d||!Array.isArray(d.missions))return;const ids=new Set(BUILTIN.map(m=>m.id));MISSIONS=BUILTIN.concat(d.missions.filter(m=>m&&m.id&&!ids.has(m.id)&&Array.isArray(m.rules)&&m.rules.length));if(!$('#ovMissions').hidden)buildMissions();}).catch(()=>{});}
 /* ===== state ===== */
 const DEF={dial:7150000,rit:0,mode:'LSB',step:100,af:30,rf:100,sql:0,mic:50,pwr:100,comp:0,fil:2400,shift:0,nb:false,nr:false,nrl:5,notch:false,agc:'F',pitch:600,preamp:10,bits:16,order:4,ant:'dipole',tuner:false,bpf:'auto',lpf:'auto',micDist:'normal',txLow:300,txHigh:2700,rise:5,dataMode:'narrow',span:20000,meter:'PO'};
 const S=Object.assign({power:false,tx:false,key:false,mon:'me',voice:'test'},JSON.parse(JSON.stringify(DEF)));
@@ -826,7 +870,7 @@ function drawMeter(t){const W=532,H=34;mc.setTransform(DPR,0,0,DPR,0,0);mc.clear
 const dataDec={txt:'',acc:0,id:null,ci:0,own:'',ownAcc:0,ownCi:0};
 function decodeLine(t,dt){const el=$('#decode');if(!S.power){el.textContent='';return;}
  if(S.tx){const r=T;if(S.mode==='CW'){cwDecodeTick();el.innerHTML='<span class="k">THEY COPY ▸ </span>'+(r.radiate?esc(cwDec.out+cwDec.buf.replace(/./g,'·')):'<span class="d">nothing, you are on the dummy load</span>');return;}
-  if(S.mode==='DATA'){const txt='CQ CQ DE '+stationId()+' '+stationId()+' K  ';dataDec.ownAcc+=dt*(S.dataMode==='wide'?4:1.3);while(dataDec.ownAcc>=1){dataDec.ownAcc-=1;const c=txt[dataDec.ownCi++%txt.length];dataDec.own+=(!r.radiate?'':r.overDb>0&&Math.random()<0.6?'·':c);dataDec.own=dataDec.own.slice(-40);}el.innerHTML='<span class="k">THEY DECODE ▸ </span>'+(r.radiate?esc(dataDec.own):'<span class="d">nothing received</span>');return;}
+  if(S.mode==='DATA'){const txt='CQ CQ DE '+dispCall(stationId())+' '+dispCall(stationId())+' K  ';dataDec.ownAcc+=dt*(S.dataMode==='wide'?4:1.3);while(dataDec.ownAcc>=1){dataDec.ownAcc-=1;const c=txt[dataDec.ownCi++%txt.length];dataDec.own+=(!r.radiate?'':r.overDb>0&&Math.random()<0.6?'·':c);dataDec.own=dataDec.own.slice(-40);}el.innerHTML='<span class="k">THEY DECODE ▸ </span>'+(r.radiate?esc(dataDec.own):'<span class="d">nothing received</span>');return;}
   if(S.voice==='live'&&S.mon==='them'){el.innerHTML='<span class="k">RECORDING ▸ </span>speak or shout now · release PTT to hear how they heard you';return;}
   let msg;if(!r.radiate)msg=S.ant==='dummy'?'nothing: you are transmitting into the dummy load':A?'nothing from you':'nothing: wrong sideband for this band';else if(r.overDb>0)msg='harsh and distorted, splattering onto neighbours';else if(r.driveDb<-8)msg='very quiet: more mic gain';else if(r.snrFull<10)msg='weak, deep in the noise';else msg='clean and clear';el.innerHTML='<span class="k">THEY HEAR ▸ </span>'+msg;return;}
  if(repOn){el.innerHTML='<span class="k">PLAYING BACK ▸ </span>this is how the other station heard you';return;}
@@ -840,7 +884,11 @@ function decodeLine(t,dt){const el=$('#decode');if(!S.power){el.textContent='';r
  const b=curBand;let seg;if(!b||S.dial<b.lo||S.dial>b.hi)seg='OUTSIDE THE AMATEUR BANDS';else seg=b.name+(b.k==='5'?' · FULL LICENCE ONLY':b.k==='10'?' · CW AND DATA ONLY':S.dial<b.seg?' · CW AND DATA SEGMENT':' · PHONE SEGMENT');
  el.innerHTML='<span class="d">'+seg+(S.sql>0&&!sqOpen?' · SQUELCH CLOSED':'')+'</span>';}
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-function stationId(){return (save.id||'CADET').toUpperCase();}
+function stationId(){return save.id||'CADET';}
+const normCall=v=>String(v||'').toUpperCase().replace(/[ØΦ∅]/g,'0').replace(/[^A-Z0-9/]/g,'').slice(0,10);
+const dispCall=c=>String(c||'').replace(/0/g,'Ø');
+const callOk=c=>/^[A-Z0-9/]{2,10}$/.test(c);
+async function sha256(t){if(!(window.crypto&&crypto.subtle))return '';const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 
 /* ===== inside view ===== */
 let lidOpen=false,selBlk='dsp';
@@ -901,39 +949,142 @@ function drawLid(tt){const nowP=performance.now();allBlocks().forEach(b=>{const 
 /* ===== missions ===== */
 function snapshot(){const o={};for(const k in DEF)o[k]=S[k];return o;}
 function applyState(st){Object.assign(S,JSON.parse(JSON.stringify(DEF)),st);filBy={LSB:2400,USB:2400,CW:500,DATA:2500};filBy[S.mode]=S.fil=st.fil||filBy[S.mode];report='';cwDec.out='';dataDec.txt='';wfClear=true;knobs.fil.range();changed();}
-function startMission(m){MIS=m;applyState(m.start||{});A=m.id==='free'?null:{m,t0:now(),start:snapshot(),changes:[],txs:[]};$('#mTitle').textContent=m.title;$('#mBrief').textContent=m.brief;$('#bSubmit').hidden=m.id==='free';}
-function buildMissions(){const h=$('#mList');h.innerHTML='';MISSIONS.forEach(m=>{const b=document.createElement('button');b.type='button';b.className='mc';const done=save.passed[m.id];b.innerHTML='<span class="mt">'+m.title+(done?'<span class="badge">PASSED</span>':'')+'</span><span class="mb">'+m.brief+'</span><span class="mm">'+(m.id==='free'?'NOT SCORED':(m.rules.length+' CHECKS · ABOUT '+m.time))+'</span>';b.addEventListener('click',()=>{sfx.click();$('#ovMissions').hidden=true;if(m.id==='free'){startMission(m);return;}$('#brT').textContent=m.title;$('#brB').textContent=m.brief;$('#ovBrief').hidden=false;$('#brGo').onclick=()=>{$('#ovBrief').hidden=true;startMission(m);};});h.appendChild(b);});}
+function startMission(m){MIS=m;applyState(m.start||{});A=m.id==='free'?null:{m,t0:now(),start:snapshot(),changes:[],txs:[]};$('#mTitle').textContent=m.title+(A?' · '+dispCall(save.id):'')+(m.test?' · TEST':'');$('#mBrief').textContent=m.brief;$('#bSubmit').hidden=m.id==='free';}
+function buildMissions(){const h=$('#mList');h.innerHTML='';MISSIONS.forEach(m=>{const b=document.createElement('button');b.type='button';b.className='mc';const done=save.passed[m.id];b.innerHTML='<span class="mt">'+esc(m.title)+(done?'<span class="badge">PASSED</span>':'')+(m.custom?'<span class="badge" style="border-color:var(--cyan);color:var(--cyan)">NEW</span>':'')+'</span><span class="mb">'+esc(m.brief)+'</span><span class="mm">'+(m.id==='free'?'NOT SCORED':(m.rules.length+' CHECKS · ABOUT '+esc(m.time||'5 min')))+'</span>';b.addEventListener('click',()=>{sfx.click();$('#ovMissions').hidden=true;if(m.id==='free'){startMission(m);return;}openBrief(m);});h.appendChild(b);});}
+function openBrief(m){$('#brT').textContent=m.title;$('#brB').textContent=m.brief;$('#brCallF').hidden=false;$('#brCall').value=dispCall(save.id||'');$('#brErr').textContent='';$('#brGo').textContent='START MISSION';$('#ovBrief').hidden=false;
+ $('#brGo').onclick=()=>{const c=normCall($('#brCall').value);if(!callOk(c)){$('#brErr').textContent='Enter your callsign (2 to 10 letters and numbers) so your instructor can see your result.';$('#brCall').focus();return;}save.id=c;lsSet('hf1.v1',save);$('#ovBrief').hidden=true;startMission(m);};setTimeout(()=>{if(!save.id)$('#brCall').focus();},60);}
+$('#brCall').addEventListener('input',e=>{const c=normCall(e.target.value);e.target.value=dispCall(c);});
+$('#brCall').addEventListener('keydown',e=>{if(e.key==='Enter')$('#brGo').click();});
 $('#brCancel').addEventListener('click',()=>{$('#ovBrief').hidden=true;$('#ovMissions').hidden=false;});
 $('#bMission').addEventListener('click',()=>{sfx.click();buildMissions();$('#ovMissions').hidden=false;});$('#bMissClose').addEventListener('click',()=>{$('#ovMissions').hidden=true;});
-$('#bBrief').addEventListener('click',()=>{if(MIS.id==='free'){buildMissions();$('#ovMissions').hidden=false;return;}$('#brT').textContent=MIS.title;$('#brB').textContent=MIS.brief;$('#brGo').textContent='CARRY ON';$('#brGo').onclick=()=>{$('#ovBrief').hidden=true;$('#brGo').textContent='START MISSION';};$('#ovBrief').hidden=false;});
-$('#bSubmit').addEventListener('click',()=>{if(!A)return;if(S.tx)stopTX();if(A.m.answer){$('#ansQ').textContent=A.m.question;$('#ansIn').value='';$('#ovAnswer').hidden=false;setTimeout(()=>$('#ansIn').focus(),50);return;}finish('');});
-$('#ansCancel').addEventListener('click',()=>{$('#ovAnswer').hidden=true;});$('#ansGo').addEventListener('click',()=>{$('#ovAnswer').hidden=true;finish($('#ansIn').value);});
-$('#ansIn').addEventListener('keydown',e=>{if(e.key==='Enter'){$('#ovAnswer').hidden=true;finish($('#ansIn').value);}});
-function evalRule(r,ans){const tx=A.txs;const fmtv=(s,v,e)=>s.replace('{v}',v).replace('{edge}',e||'');
+$('#bBrief').addEventListener('click',()=>{if(MIS.id==='free'){buildMissions();$('#ovMissions').hidden=false;return;}$('#brT').textContent=MIS.title;$('#brB').textContent=MIS.brief;$('#brCallF').hidden=true;$('#brErr').textContent='';$('#brGo').textContent='CARRY ON';$('#brGo').onclick=()=>{$('#ovBrief').hidden=true;$('#brGo').textContent='START MISSION';};$('#ovBrief').hidden=false;});
+$('#bSubmit').addEventListener('click',()=>{if(!A)return;if(S.tx)stopTX();if(A.m.answer||A.m.answerHash){$('#ansQ').textContent=A.m.question;$('#ansIn').value='';$('#ovAnswer').hidden=false;setTimeout(()=>$('#ansIn').focus(),50);return;}finish('');});
+$('#ansCancel').addEventListener('click',()=>{$('#ovAnswer').hidden=true;});async function submitAnswer(){$('#ovAnswer').hidden=true;const a=normCall($('#ansIn').value);finish(a,await sha256(a));}
+$('#ansGo').addEventListener('click',submitAnswer);
+$('#ansIn').addEventListener('keydown',e=>{if(e.key==='Enter')submitAnswer();});
+function evalRule(r,ans,ansHash){const fv=v=>fmtVal(r.field,v);const tx=A.txs;const fmtv=(s,v,e)=>s.replace('{v}',v).replace('{edge}',e||'');
  switch(r.check){
   case'txMax':{if(!tx.length)return[false,'You did not make a test transmission.'];const v=Math.max(...tx.map(x=>x[r.field]));const shown=r.field==='pep'?Math.round(v):v.toFixed(1);return[v<=r.max,fmtv(v<=r.max?r.ok:r.no,shown)];}
   case'txInside':{if(!tx.length)return[false,'You did not make a test transmission.'];for(const x of tx){const ok=r.ranges.some(g=>x.lo>=g[0]&&x.hi<=g[1]);if(!ok){const rg=r.ranges.find(g=>x.hi>=g[0]&&x.lo<=g[1]);let e=x.lo;if(rg)e=x.hi>rg[1]?x.hi:x.lo;else e=(x.lo+x.hi)/2;return[false,fmtv(r.no,'',fmtMHz(e))];}}return[true,r.ok];}
-  case'setting':{const ok=r.anyOf.includes(S[r.field]);return[ok,ok?r.ok:r.no];}
-  case'max':{const ok=S[r.field]<=r.max;return[ok,fmtv(ok?r.ok:r.no,S[r.field])];}
+  case'setting':{const ok=r.anyOf.includes(S[r.field]);return[ok,fmtv(ok?r.ok:r.no,fv(S[r.field]))];}
+  case'range':{const v=S[r.field],ok=v>=r.min&&v<=r.max;return[ok,fmtv(ok?r.ok:r.no,fv(v))];}
+  case'min':{const ok=S[r.field]>=r.min;return[ok,fmtv(ok?r.ok:r.no,fv(S[r.field]))];}
+  case'max':{const ok=S[r.field]<=r.max;return[ok,fmtv(ok?r.ok:r.no,r.field==='fil'?S[r.field]:fv(S[r.field]))];}
   case'changed':{const ok=A.changes.some(c=>c.k===r.field)||S[r.field]!==A.start[r.field];return[ok,ok?r.ok:r.no];}
   case'unchanged':{const ok=S[r.field]===A.start[r.field];return[ok,ok?r.ok:r.no];}
   case'rxOffset':{const st=(ST['7']||[]).concat(...Object.values(ST)).find(s=>s.id===r.station);const off=Math.round(Math.abs(S.dial+S.rit-st.f));const ok=off<=r.tol;return[ok,fmtv(ok?r.ok:r.no,off)];}
-  case'answer':{const a=(ans||'').toUpperCase().replace(/[^A-Z0-9/]/g,'');const ok=a===A.m.answer;return[ok,fmtv(ok?r.ok:r.no,a||'nothing')];}}
+  case'answer':{const a=normCall(ans);const ok=A.m.answerHash?(!!ansHash&&ansHash===A.m.answerHash):a===normCall(A.m.answer);return[ok,fmtv(ok?r.ok:r.no,dispCall(a)||'nothing')];}}
  return[false,''];}
-function finish(ans){flushAll();const m=A.m;let pts=0,max=0,lic=false;const rows=m.rules.map(r=>{const[ok,msg]=evalRule(r,ans);if(r.kind==='licence'){if(!ok)lic=true;}else{max+=r.points;if(ok)pts+=r.points;}return{r,ok,msg};});
- const passed=!lic&&pts>=m.pass;const rec={m:m.id,title:m.title,when:new Date().toISOString(),pts,max,passed,lic};save.log.unshift(rec);save.log=save.log.slice(0,40);if(passed)save.passed[m.id]=true;lsSet('hf1.v1',save);
+function finish(ans,ansHash){flushAll();const m=A.m;let pts=0,max=0,lic=false;const rows=m.rules.map(r=>{const[ok,msg]=evalRule(r,ans,ansHash);if(r.kind==='licence'){if(!ok)lic=true;}else{max+=r.points;if(ok)pts+=r.points;}return{r,ok,msg};});
+ const passed=!lic&&pts>=m.pass;if(m.test){pts=pts;}const rec={call:save.id,m:m.id,title:m.title+(m.test?' (test)':''),when:new Date().toISOString(),pts,max,passed,lic};save.log.unshift(rec);save.log=save.log.slice(0,40);if(passed&&!m.test)save.passed[m.id]=true;lsSet('hf1.v1',save);
  const kindL={licence:'LICENCE',practice:'GOOD PRACTICE',efficiency:'EFFICIENCY'};
  const rep=A.changes.slice(-14).map(c=>'<div>'+c.t.toFixed(1).padStart(5,' ')+' s  '+(c.k==='dial'?'MAIN DIAL':c.k.toUpperCase())+'  '+fmtVal(c.k,c.o)+' → <span class="a">'+fmtVal(c.k,c.v)+'</span>'+(c.tx?'  (while transmitting)':'')+'</div>').join('')||'<div>No changes made.</div>';
  const txs=A.txs.map((x,i)=>'<div>TX '+(i+1)+'  '+x.mode+'  '+fmtMHz(x.lo)+' to '+fmtMHz(x.hi)+'  peak <span class="a">'+Math.round(x.pep)+' W</span>'+(x.splatter>0?'  splatter':'')+'</div>').join('');
- $('#resCard').innerHTML='<h2>'+m.title.toUpperCase()+'</h2><div class="verdict"><b class="'+(passed?'p':'f')+'">'+(passed?'PASS':'NOT YET')+'</b><span>'+pts+' / '+max+' points</span>'+(lic?'<span style="color:var(--bad);font:700 15px var(--f-panel);letter-spacing:1.4px">LICENCE BREACH: AUTOMATIC FAIL</span>':'')+'</div><div class="rules">'+rows.map(x=>'<div class="rule '+(x.ok?'ok':'no')+'"><span class="ic">'+(x.ok?'✓':'✗')+'</span><span class="kd">'+kindL[x.r.kind]+'</span><span class="tx">'+esc(x.msg)+'</span><span class="pt">'+(x.r.kind==='licence'?'must':(x.ok?x.r.points:0)+'/'+x.r.points)+'</span></div>').join('')+'</div><div class="replay"><div>REPLAY</div>'+txs+rep+'</div><div class="btnrow"><button class="tb" id="resFree" type="button">FREE PLAY</button><button class="tb" id="resList" type="button">MISSIONS</button><button class="tb accent" id="resRetry" type="button">TRY AGAIN</button></div>';
+ $('#resCard').innerHTML='<h2>'+esc(m.title.toUpperCase())+'</h2><p class="sub" style="margin:-2px 0 8px;font-family:var(--f-lcd)">STATION '+esc(dispCall(save.id))+(m.test?' · BUILDER TEST, NOT SAVED':'')+'</p><div class="verdict"><b class="'+(passed?'p':'f')+'">'+(passed?'PASS':'NOT YET')+'</b><span>'+pts+' / '+max+' points</span>'+(lic?'<span style="color:var(--bad);font:700 15px var(--f-panel);letter-spacing:1.4px">LICENCE BREACH: AUTOMATIC FAIL</span>':'')+'</div><div class="rules">'+rows.map(x=>'<div class="rule '+(x.ok?'ok':'no')+'"><span class="ic">'+(x.ok?'✓':'✗')+'</span><span class="kd">'+kindL[x.r.kind]+'</span><span class="tx">'+esc(x.msg)+'</span><span class="pt">'+(x.r.kind==='licence'?'must':(x.ok?x.r.points:0)+'/'+x.r.points)+'</span></div>').join('')+'</div><div class="replay"><div>REPLAY</div>'+txs+rep+'</div><div class="btnrow"><button class="tb" id="resFree" type="button">FREE PLAY</button><button class="tb" id="resList" type="button">MISSIONS</button><button class="tb accent" id="resRetry" type="button">TRY AGAIN</button></div>';
  $('#ovResults').hidden=false;
- send('/api/attempt',{v:APP_VERSION,tester:stationId(),mission:m.id,points:pts,max:max,passed:passed,licence:lic,rules:rows.map(x=>({id:x.r.id,ok:x.ok})),txs:A.txs.length,changes:A.changes.length,secs:Math.round(now()-A.t0)}).catch(()=>{});
+ if(!m.test)send('/api/attempt',{v:APP_VERSION,callsign:save.id,mission:m.id,points:pts,max:max,passed:passed,licence:lic,rules:rows.map(x=>({id:x.r.id,ok:x.ok})),txs:A.txs.length,changes:A.changes.length,secs:Math.round(now()-A.t0)}).catch(()=>{});
  $('#resRetry').onclick=()=>{$('#ovResults').hidden=true;startMission(m);};$('#resList').onclick=()=>{$('#ovResults').hidden=true;buildMissions();$('#ovMissions').hidden=false;};$('#resFree').onclick=()=>{$('#ovResults').hidden=true;MIS=MISSIONS[0];A=null;$('#mTitle').textContent='Free play';$('#mBrief').textContent=MISSIONS[0].brief;$('#bSubmit').hidden=true;};}
 function fmtVal(k,v){if(k==='dial')return fmtF(v);if(k==='pwr')return v+' W';if(k==='fil'||k==='shift'||k==='rit')return v+' Hz';if(typeof v==='boolean')return v?'on':'off';return String(v);}
 
+/* ===== mission builder (open the site with ?builder) ===== */
+const BUILDER=/[?&]builder\b/.test(location.search);
+const BF=[['dial','MAIN DIAL'],['mode','MODE'],['rit','RIT'],['fil','FILTER WIDTH'],['shift','IF SHIFT'],['pwr','PWR'],['mic','MIC GAIN'],['comp','COMP'],['af','AF GAIN'],['rf','RF GAIN'],['sql','SQUELCH'],['agc','AGC'],['preamp','PREAMP'],['nb','NB'],['nr','NR'],['notch','NOTCH'],['tuner','TUNER'],['ant','ANTENNA'],['bpf','BAND FILTER'],['lpf','LOW-PASS FILTER'],['micDist','MIC DISTANCE'],['dataMode','DATA MODE'],['bits','ADC BITS'],['order','FILTER STEEPNESS'],['pitch','CW PITCH'],['rise','CW RISE TIME'],['txLow','TX LOW CUT'],['txHigh','TX HIGH CUT']];
+const BLAB=Object.fromEntries(BF);
+const NUMF=new Set(['dial','rit','fil','shift','pwr','mic','comp','af','rf','sql','preamp','bits','order','pitch','rise','txLow','txHigh']);
+const BOOLF=new Set(['nb','nr','notch','tuner']);
+const LICT={foundation:{n:'Foundation',pep:25,r:FOUNDATION},intermediate:{n:'Intermediate',pep:100,r:FOUNDATION},full:{n:'Full',pep:100,r:BANDS.map(b=>[b.lo,b.hi])}};
+const MATCH=[['ignore','Ignore'],['exact','Exact'],['anyof','Any of'],['range','Range'],['max','At most'],['min','At least'],['unchanged','Must not change'],['changed','Must use']];
+function newB(){return{id:'',title:'',brief:'',question:'',answer:'',ansHash:'',time:'5 min',start:null,ans:null,f:{},tx:{req:true,lic:'foundation',alc:false,segLo:'',segHi:'',station:'',tol:50},pass:'',all:false};}
+let B=newB();try{const k=sessionStorage.getItem('hf1key');if(k)$('#bKey').value=k;}catch(e){}
+const showV=(k,v)=>v===undefined||v===null?'':k==='dial'?(v/1e6).toFixed(4):BOOLF.has(k)?(v?'on':'off'):String(v);
+function parseV(k,t){t=String(t==null?'':t).trim();if(k==='dial')return Math.round(parseFloat(t)*1e6);if(NUMF.has(k))return Number(t);if(BOOLF.has(k))return /^(on|true|yes|1)$/i.test(t);if(k==='mode')return t.toUpperCase();return t;}
+function defMatch(k,s,a){if(!s||s[k]===a[k])return{m:'ignore',a:showV(k,a[k]),b:''};if(!NUMF.has(k))return{m:'exact',a:showV(k,a[k]),b:''};const v=a[k];if(k==='dial')return{m:'range',a:showV(k,v-1000),b:showV(k,v+1000)};if(k==='pwr')return{m:'max',a:String(v),b:''};const tol={rit:50,fil:200,shift:100,mic:10,pitch:50,txLow:50,txHigh:100}[k]??Math.max(1,Math.round(Math.abs(v)*0.1));return{m:'range',a:String(v-tol),b:String(v+tol)};}
+function summary(st){if(!st)return'Not captured yet.';const d=[];for(const[k]of BF){if(['dial','mode','pwr','mic','fil','rit'].includes(k))continue;if(st[k]!==DEF[k])d.push(BLAB[k]+' '+showV(k,st[k]));}return fmtF(st.dial)+' '+st.mode+' · PWR '+st.pwr+' W · MIC '+st.mic+' · FIL '+st.fil+' Hz · RIT '+sgn(st.rit)+' Hz'+(d.length?' · '+d.join(' · '):'');}
+function buildRules(){const rules=[];let n=0;const id=p=>(p+(++n)).slice(0,24);
+ for(const[k,lab]of BF){const f=B.f[k];if(!f||f.m==='ignore')continue;const base={id:id(k),kind:f.kind||'practice',field:k};if(base.kind!=='licence')base.points=Math.max(0,Math.round(+f.pts||0));
+  if(f.m==='exact'){const v=parseV(k,f.a);rules.push(Object.assign(base,{check:'setting',anyOf:[v],ok:lab+' set correctly: {v}.',no:lab+' should be '+fmtVal(k,v)+'. You had {v}.'}));}
+  else if(f.m==='anyof'){const vs=String(f.a).split(',').map(x=>parseV(k,x)).filter(x=>x!==''&&!(typeof x==='number'&&isNaN(x)));rules.push(Object.assign(base,{check:'setting',anyOf:vs,ok:lab+' set correctly: {v}.',no:lab+' should be one of '+vs.map(v=>fmtVal(k,v)).join(', ')+'. You had {v}.'}));}
+  else if(f.m==='range'){const lo=parseV(k,f.a),hi=parseV(k,f.b);rules.push(Object.assign(base,{check:'range',min:Math.min(lo,hi),max:Math.max(lo,hi),ok:lab+' at {v}, inside the range.',no:lab+' at {v}. It needed to be between '+fmtVal(k,Math.min(lo,hi))+' and '+fmtVal(k,Math.max(lo,hi))+'.'}));}
+  else if(f.m==='max'){const v=parseV(k,f.a);rules.push(Object.assign(base,{check:'max',max:v,ok:lab+' at {v}, no more than '+fmtVal(k,v)+'.',no:lab+' at {v}. It should be no more than '+fmtVal(k,v)+'.'}));}
+  else if(f.m==='min'){const v=parseV(k,f.a);rules.push(Object.assign(base,{check:'min',min:v,ok:lab+' at {v}, at least '+fmtVal(k,v)+'.',no:lab+' at {v}. It should be at least '+fmtVal(k,v)+'.'}));}
+  else if(f.m==='unchanged')rules.push(Object.assign(base,{check:'unchanged',ok:lab+' left as it was.',no:lab+' was changed. This one should stay as it was.'}));
+  else if(f.m==='changed')rules.push(Object.assign(base,{check:'changed',ok:'You used '+lab+'.',no:lab+' is the control to use here.'}));}
+ const L=LICT[B.tx.lic];
+ if(L){rules.push({id:id('lic'),kind:'licence',check:'txMax',field:'pep',max:L.pep,ok:'Peak power within '+L.pep+' W PEP.',no:'You peaked at {v} W PEP. A '+L.n+' licence allows '+L.pep+' W here.'});
+  rules.push({id:id('band'),kind:'licence',check:'txInside',ranges:L.r,ok:'Your whole signal stayed inside a band you can use.',no:'Your signal reached {edge}, outside the bands a '+L.n+' licence allows.'});
+  rules.push({id:id('clean'),kind:'licence',check:'txMax',field:'splatter',max:0,ok:'Clean signal with no splatter.',no:'You overdrove the transmitter and splattered onto your neighbours.'});}
+ else if(B.tx.req)rules.push({id:id('tx'),kind:'practice',points:1,check:'txMax',field:'pep',max:100000,ok:'You made a test transmission.',no:'You did not make a test transmission.'});
+ if(B.tx.alc)rules.push({id:id('alc'),kind:'practice',points:3,check:'txMax',field:'alc',max:0.001,ok:'ALC stayed at zero.',no:'The ALC moved. Keep it at zero.'});
+ const sl=parseFloat(B.tx.segLo),sh=parseFloat(B.tx.segHi);if(sl>0&&sh>0){const lo=Math.round(Math.min(sl,sh)*1e6),hi=Math.round(Math.max(sl,sh)*1e6);rules.push({id:id('seg'),kind:'practice',points:2,check:'txInside',ranges:[[lo,hi]],ok:'Your signal stayed between '+(lo/1e6).toFixed(3)+' and '+(hi/1e6).toFixed(3)+' MHz.',no:'You transmitted at {edge}, outside the part of the band this needs.'});}
+ if(B.tx.station)rules.push({id:id('stn'),kind:'practice',points:3,check:'rxOffset',station:B.tx.station,tol:Math.max(5,+B.tx.tol||50),ok:'Tuned onto the station.',no:'You finished {v} Hz away from the station.'});
+ if(B.question&&(B.answer||B.ansHash))rules.push({id:id('ans'),kind:'practice',points:5,check:'answer',ok:'Correct answer.',no:'You answered {v}. That is not right.'});
+ return rules;}
+function stateCheck(r,st){const v=st[r.field];if(r.check==='setting')return r.anyOf.includes(v);if(r.check==='range')return v>=r.min&&v<=r.max;if(r.check==='max')return v<=r.max;if(r.check==='min')return v>=r.min;return null;}
+function bReview(){const rules=buildRules();const total=rules.reduce((a,r)=>a+(r.kind==='licence'?0:r.points||0),0);const pass=B.pass!==''?Math.max(0,Math.round(+B.pass)):Math.max(1,Math.round(total*0.7));const errs=[],warns=[];
+ if(!B.title.trim())errs.push('Give the mission a title.');if(!B.brief.trim())errs.push('Write the brief the cadet will read.');if(!B.start)errs.push('Capture the starting state.');if(!rules.length)errs.push('Add at least one check.');if(B.question&&!B.answer&&!B.ansHash)errs.push('You asked a question, so add the answer.');if(pass>total)errs.push('The pass mark ('+pass+') is higher than the total points ('+total+').');
+ const sr=rules.filter(r=>['setting','range','max','min'].includes(r.check));
+ if(B.ans){const bad=sr.filter(r=>stateCheck(r,B.ans)===false);if(bad.length)warns.push('Your own captured answer fails: '+bad.map(r=>BLAB[r.field]).join(', ')+'.');}
+ if(B.start&&sr.length&&sr.every(r=>stateCheck(r,B.start)))warns.push('The starting state already passes every settings check.');
+ if(sr.length>=3&&sr.every(r=>r.check==='setting'))warns.push('Every settings check is an exact match. A range lets cadets reach the answer in different ways.');
+ const L=LICT[B.tx.lic];if(L&&B.ans){if(B.ans.pwr>L.pep)warns.push('Your answer uses '+B.ans.pwr+' W, above the '+L.pep+' W '+L.n+' limit.');if(!L.r.some(g=>B.ans.dial>=g[0]+3000&&B.ans.dial<=g[1]-3000))warns.push('Your answer frequency is at or outside a band edge for a '+L.n+' licence.');}
+ if(rules.some(r=>r.check==='unchanged'&&r.field==='dial')&&B.start&&B.ans&&B.start.dial!==B.ans.dial)warns.push('MAIN DIAL is set to "must not change" but your answer moved it.');
+ return{rules,total,pass,errs,warns};}
+function bStations(){const st=B.ans||B.start||snapshot();const b=bandOf(st.dial);const f=st.dial+(st.rit||0);return b?ST[b.k].filter(s=>s.type!=='bc').map(s=>({s,d:Math.abs(s.f-f)})).sort((a,b)=>a.d-b.d):[];}
+function renderB(){const rv=bReview();const sel=(name,opts,cur,attr)=>'<select class="bsel" '+attr+' aria-label="'+name+'">'+opts.map(o=>'<option value="'+o[0]+'"'+(String(cur)===String(o[0])?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
+ let rows='';if(B.ans){for(const[k,lab]of BF){const f=B.f[k]||(B.f[k]={m:'ignore',a:showV(k,B.ans[k]),b:'',kind:'practice',pts:2});const ch=B.start&&B.start[k]!==B.ans[k];if(!B.all&&!ch&&f.m==='ignore')continue;const needA=['exact','anyof','range','max','min'].includes(f.m);
+  rows+='<tr class="'+(f.m!=='ignore'?'on':'')+'"><td>'+lab+'</td><td class="v">'+esc(showV(k,B.start&&B.start[k]))+'</td><td class="v">'+esc(showV(k,B.ans[k]))+'</td><td>'+sel('Check for '+lab,MATCH,f.m,'data-f="'+k+':m"')+'</td><td>'+(needA?'<input class="bin" data-f="'+k+':a" value="'+esc(f.a)+'" aria-label="'+lab+' value"'+(k==='dial'?' placeholder="MHz"':'')+'>':'')+(f.m==='range'?' to <input class="bin" data-f="'+k+':b" value="'+esc(f.b)+'" aria-label="'+lab+' upper value">':'')+'</td><td>'+(f.m==='ignore'?'':sel('Kind for '+lab,[['practice','Good practice'],['efficiency','Efficiency'],['licence','Licence (must pass)']],f.kind,'data-f="'+k+':kind"'))+'</td><td>'+(f.m==='ignore'||f.kind==='licence'?'':'<input class="bin" style="width:50px" data-f="'+k+':pts" value="'+esc(f.pts)+'" aria-label="Points for '+lab+'">')+'</td></tr>';}}
+ const stOpts=[['','None']].concat(bStations().map(x=>[x.s.id,x.s.type.toUpperCase()+' '+fmtF(x.s.f)+(x.s.clip?' ('+x.s.clip+')':'')+(x.d<3000?' · '+Math.round(x.d)+' Hz from answer':'')]));
+ $('#bldBody').innerHTML=
+ '<div class="bsec" style="border:0;margin-top:6px"><h3>1 · DETAILS</h3><div class="bgrid"><label class="blab">TITLE<input class="bin w" data-b="title" maxlength="60" value="'+esc(B.title)+'"></label><label class="blab">TIME TO ALLOW<input class="bin w" data-b="time" maxlength="12" value="'+esc(B.time)+'"></label></div>'
+ +'<label class="blab" style="margin-top:8px">BRIEF THE CADET READS<textarea class="bin w" data-b="brief" rows="3" maxlength="800">'+esc(B.brief)+'</textarea></label>'
+ +'<div class="bgrid" style="margin-top:8px"><label class="blab">QUESTION (OPTIONAL)<input class="bin w" data-b="question" maxlength="200" value="'+esc(B.question)+'" placeholder="e.g. Which callsign is the beacon sending?"></label><label class="blab">ANSWER<input class="bin w" data-b="answer" maxlength="12" value="'+esc(B.answer)+'" placeholder="'+(B.ansHash?'Saved. Type to change':'e.g. GB4CIS')+'"></label></div></div>'
+ +'<div class="bsec"><h3>2 · STARTING STATE</h3><div class="sum">'+esc(summary(B.start))+'</div><button class="tb" type="button" data-act="cap">SET IT UP ON THE RADIO</button></div>'
+ +'<div class="bsec"><h3>3 · CORRECT ANSWER</h3><div class="sum">'+esc(summary(B.ans))+'</div><button class="tb" type="button" data-act="cap">SET IT UP ON THE RADIO</button>'
+ +(B.ans?' <button class="linkb" type="button" data-act="all">'+(B.all?'Show only what changed':'Show every setting')+'</button><div style="overflow-x:auto;margin-top:8px"><table class="btab"><tr><th>SETTING</th><th>START</th><th>ANSWER</th><th>CHECK</th><th>VALUES</th><th>KIND</th><th>PTS</th></tr>'+(rows||'<tr><td colspan="7">Nothing differs from the start. Show every setting to add checks.</td></tr>')+'</table></div>':'')+'</div>'
+ +'<div class="bsec"><h3>4 · TRANSMISSION AND LICENCE</h3><div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">'
+ +'<label class="blab">LICENCE RULES'+sel('Licence rules',[['none','None'],['foundation','Foundation · 25 W'],['intermediate','Intermediate · 100 W'],['full','Full · radio max 100 W']],B.tx.lic,'data-t="lic"')+'</label>'
+ +(B.tx.lic==='none'?'<label class="chk"><input type="checkbox" data-t="req"'+(B.tx.req?' checked':'')+'>Needs a test transmission</label>':'')
+ +'<label class="chk"><input type="checkbox" data-t="alc"'+(B.tx.alc?' checked':'')+'>ALC must stay at zero</label>'
+ +'<label class="blab">SIGNAL MUST STAY BETWEEN (MHz)<span><input class="bin" data-t="segLo" value="'+esc(B.tx.segLo)+'" placeholder="7.000"> and <input class="bin" data-t="segHi" value="'+esc(B.tx.segHi)+'" placeholder="7.050"></span></label></div>'
+ +'<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><label class="blab">MUST BE TUNED ONTO'+sel('Station to tune onto',stOpts,B.tx.station,'data-t="station"')+'</label><label class="blab">WITHIN (Hz)<input class="bin" data-t="tol" value="'+esc(B.tx.tol)+'"></label></div></div>'
+ +'<div class="bsec"><h3>5 · SCORING AND CHECKS</h3><div id="bScore"></div></div>';
+ bScore();}
+function bScore(){const rv=bReview();$('#bScore').innerHTML='<div class="crow"><span style="font:15px var(--f-text)">'+rv.rules.length+' checks · '+rv.total+' points · licence checks must all pass</span><label for="bPass" style="margin-left:12px">PASS MARK</label><input id="bPass" class="bin" style="width:60px" data-b="pass" value="'+esc(B.pass)+'" placeholder="'+rv.pass+'"></div>'+rv.errs.map(e=>'<p class="err">✗ '+esc(e)+'</p>').join('')+rv.warns.map(w=>'<p class="warn">! '+esc(w)+'</p>').join('')+(!rv.errs.length&&!rv.warns.length?'<p class="note" style="color:var(--good)">✓ Ready to test and save.</p>':'');}
+$('#bldBody').addEventListener('input',e=>{const el=e.target;if(el.dataset.b){B[el.dataset.b]=el.value;if(el.dataset.b!=='pass')bScoreSoon();else bScoreKeep();}else if(el.dataset.f&&el.tagName==='INPUT'){const[k,p]=el.dataset.f.split(':');B.f[k][p]=el.value;bScoreSoon();}else if(el.dataset.t&&el.tagName==='INPUT'&&el.type!=='checkbox'){B.tx[el.dataset.t]=el.value;bScoreSoon();}});
+$('#bldBody').addEventListener('change',e=>{const el=e.target;if(el.dataset.f&&el.tagName==='SELECT'){const[k,p]=el.dataset.f.split(':');const f=B.f[k];f[p]=el.value;if(p==='m'&&['exact','anyof','max','min','range'].includes(el.value)&&!f.a)f.a=showV(k,B.ans[k]);renderB();}else if(el.dataset.t&&(el.tagName==='SELECT'||el.type==='checkbox')){B.tx[el.dataset.t]=el.type==='checkbox'?el.checked:el.value;renderB();}});
+let bT=0;function bScoreSoon(){clearTimeout(bT);bT=setTimeout(bScoreKeep,250);}
+function bScoreKeep(){const a=document.activeElement,id=a&&a.id,pos=a&&a.selectionStart;bScore();if(id==='bPass'){const p=$('#bPass');p.focus();try{p.setSelectionRange(pos,pos);}catch(e){}}}
+$('#bldBody').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='all'){B.all=!B.all;renderB();}else if(b.dataset.act==='cap'){$('#ovBuild').hidden=true;showBar();}});
+function showBar(){$('#bBarT').textContent=!B.start?'Set the radio up the way the cadet should find it, then press CAPTURE START.':'Now set the radio up correctly and press CAPTURE ANSWER. Capturing again replaces the old one.';$('#bBar').hidden=false;}
+function openBuilder(){$('#bBar').hidden=true;$('#bMsg').textContent='';renderB();$('#ovBuild').hidden=false;}
+$('#bBuild').addEventListener('click',()=>{sfx.click();openBuilder();});
+$('#bbOpen').addEventListener('click',openBuilder);
+$('#bbStart').addEventListener('click',()=>{if(S.tx)stopTX();B.start=snapshot();if(B.ans)for(const[k]of BF)if(!B.f[k]||!B.f[k].edited)B.f[k]=Object.assign({kind:'practice',pts:2},defMatch(k,B.start,B.ans));sfx.clunk();showBar();$('#bBarT').textContent='Start captured: '+summary(B.start).slice(0,80)+'… Now set up the answer and press CAPTURE ANSWER.';});
+$('#bbAns').addEventListener('click',()=>{if(S.tx)stopTX();if(!B.start){$('#bBarT').textContent='Capture the starting state first.';return;}B.ans=snapshot();for(const[k]of BF){const d=defMatch(k,B.start,B.ans);const old=B.f[k];B.f[k]=Object.assign({kind:old?old.kind:'practice',pts:old?old.pts:2},d);}const near=bStations()[0];if(near&&near.d<300&&!B.tx.station)B.tx.station=near.s.id;sfx.clunk();openBuilder();$('#bMsg').textContent='Answer captured. Check the table and adjust what matters.';});
+$('#bldBody').addEventListener('focusin',e=>{const el=e.target;if(el.dataset&&el.dataset.f){const k=el.dataset.f.split(':')[0];if(B.f[k])B.f[k].edited=true;}});
+$('#bNew').addEventListener('click',()=>{B=newB();renderB();$('#bMsg').textContent='New mission started.';});
+$('#bClose').addEventListener('click',()=>{$('#ovBuild').hidden=true;});
+$('#bKey').addEventListener('input',e=>{try{sessionStorage.setItem('hf1key',e.target.value);}catch(x){}});
+async function missionFromB(forSave){const rv=bReview();if(rv.errs.length){$('#bMsg').textContent=rv.errs[0];return null;}
+ if(!B.id)B.id=(B.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'mission')+'-'+Math.random().toString(36).slice(2,6);
+ const start={};for(const k in DEF)if(B.start[k]!==undefined)start[k]=B.start[k];
+ const m={id:B.id,title:B.title.trim(),brief:B.brief.trim(),start,rules:rv.rules,pass:rv.pass,time:B.time.trim()||'5 min'};
+ if(B.question){m.question=B.question.trim();if(B.answer){const a=normCall(B.answer);if(forSave)m.answerHash=await sha256(a);else m.answer=a;}else if(B.ansHash)m.answerHash=B.ansHash;}
+ if(forSave){const copy=JSON.parse(JSON.stringify(B));delete copy.answer;copy.ansHash=m.answerHash||'';m.builder=copy;}
+ return m;}
+$('#bTest').addEventListener('click',async()=>{const m=await missionFromB(false);if(!m)return;m.test=true;$('#ovBuild').hidden=true;if(!callOk(save.id||'')){save.id='TEST';}startMission(m);$('#bBar').hidden=false;$('#bBarT').textContent='Testing as a cadet. SUBMIT to see the result, then OPEN BUILDER to carry on.';});
+$('#bSave').addEventListener('click',async()=>{const key=$('#bKey').value.trim();if(!key){$('#bMsg').textContent='Enter the admin key first.';return;}const m=await missionFromB(true);if(!m)return;$('#bMsg').textContent='Saving…';
+ try{const r=await fetch('/api/admin/missions',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+key},body:JSON.stringify(m)});const d=await r.json().catch(()=>({}));if(r.status===401){$('#bMsg').textContent='The admin key is not right.';return;}if(!r.ok){$('#bMsg').textContent='Not saved: '+(d.error||r.status)+'.';return;}B.id=d.id;B.ansHash=m.answerHash||B.ansHash;B.answer='';$('#bMsg').textContent='Saved. Testers see "'+m.title+'" next time they open MISSIONS.';loadMissions();refreshLoad();}
+ catch(e){$('#bMsg').textContent=ONLINE?'Could not reach the server. Try again.':'Saving works on the test site, not in this preview.';}});
+let savedRows=[];
+async function refreshLoad(){const key=$('#bKey').value.trim();if(!key||!ONLINE)return;try{const r=await fetch('/api/admin/data?limit=1',{headers:{authorization:'Bearer '+key}});if(!r.ok)return;const d=await r.json();savedRows=d.missions||[];$('#bLoad').innerHTML='<option value="">LOAD SAVED…</option>'+savedRows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.title)+(x.active?'':' (off)')+'</option>').join('');}catch(e){}}
+$('#bLoad').addEventListener('focus',refreshLoad);
+$('#bLoad').addEventListener('change',e=>{const row=savedRows.find(x=>x.id===e.target.value);e.target.value='';if(!row)return;let d={};try{d=JSON.parse(row.data);}catch(x){}const b=d.builder||{};B=Object.assign(newB(),b,{id:row.id,title:row.title,brief:d.brief||'',start:d.start||b.start||null,question:d.question||'',answer:'',ansHash:d.answerHash||'',time:d.time||'5 min',pass:String(d.pass==null?'':d.pass)});B.tx=Object.assign(newB().tx,b.tx||{});B.f=b.f||{};renderB();$('#bMsg').textContent='Loaded "'+row.title+'". Saving updates it in place.'+(d.builder?'':' It has no builder details, so its checks will be rebuilt from this page.');});
+if(BUILDER){$('#bBuild').hidden=false;}
+
 /* station log */
-$('#bLog').addEventListener('click',()=>{sfx.click();$('#stId').value=save.id||'';const rows=save.log.slice(0,12).map(r=>'<div class="logrow"><span class="s">'+r.when.slice(0,16).replace('T',' ')+'</span><span>'+esc(r.title)+'</span><span class="s">'+r.pts+'/'+r.max+'</span><span class="s" style="color:'+(r.passed?'var(--good)':'var(--bad)')+'">'+(r.passed?'PASS':'NOT YET')+'</span></div>').join('');const badges=MISSIONS.filter(m=>m.id!=='free').map(m=>'<span class="badge" style="'+(save.passed[m.id]?'':'border-color:#3a424a;color:#6f7881')+'">'+m.title.toUpperCase()+'</span>').join(' ');$('#logBody').innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px">'+badges+'</div><div class="loglist">'+(rows||'<div class="note">No attempts yet. Pick a mission to start.</div>')+'</div>';$('#ovLog').hidden=false;});
-$('#stId').addEventListener('input',e=>{save.id=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);lsSet('hf1.v1',save);});
+$('#bLog').addEventListener('click',()=>{sfx.click();$('#stId').value=dispCall(save.id||'');const rows=save.log.slice(0,12).map(r=>'<div class="logrow"><span class="s">'+r.when.slice(0,16).replace('T',' ')+'</span><span>'+esc(r.title)+'</span><span class="s">'+r.pts+'/'+r.max+'</span><span class="s" style="color:'+(r.passed?'var(--good)':'var(--bad)')+'">'+(r.passed?'PASS':'NOT YET')+'</span></div>').join('');const badges=MISSIONS.filter(m=>m.id!=='free').map(m=>'<span class="badge" style="'+(save.passed[m.id]?'':'border-color:#3a424a;color:#6f7881')+'">'+m.title.toUpperCase()+'</span>').join(' ');$('#logBody').innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px">'+badges+'</div><div class="loglist">'+(rows||'<div class="note">No attempts yet. Pick a mission to start.</div>')+'</div>';$('#ovLog').hidden=false;});
+$('#stId').addEventListener('input',e=>{save.id=normCall(e.target.value);e.target.value=dispCall(save.id);lsSet('hf1.v1',save);});
 $('#logClose').addEventListener('click',()=>{$('#ovLog').hidden=true;});
 
 /* keypad */
@@ -993,7 +1144,7 @@ function loop(){const nowP=performance.now(),dt=Math.min(0.1,(nowP-lastF)/1000);
  if(frame%10===0)for(const k in knobs)knobs[k].update();
  if(needPush)pushNow();
  requestAnimationFrame(loop);}
-buildLid();T=txCalc();updateBand();render();fit();startMission(MISSIONS[0]);requestAnimationFrame(loop);
+buildLid();T=txCalc();updateBand();render();fit();startMission(MISSIONS[0]);loadMissions();requestAnimationFrame(loop);
 </script>
 <script type="text/plain" id="engineSrc"></script>
 <script>

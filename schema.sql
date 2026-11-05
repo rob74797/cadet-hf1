@@ -28,3 +28,11 @@ CREATE TABLE IF NOT EXISTS attempts (
   secs         INTEGER
 );
 CREATE INDEX IF NOT EXISTS attempts_mission ON attempts (mission);
+CREATE TABLE IF NOT EXISTS missions (
+  id      TEXT PRIMARY KEY,
+  title   TEXT NOT NULL,
+  data    TEXT NOT NULL,
+  active  INTEGER NOT NULL DEFAULT 1,
+  updated TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS attempts_tester ON attempts (tester);
