@@ -13,7 +13,7 @@
       "binding": "DB",
       "database_name": "cadet-hf1",
       // Step 2 of the README: paste the Database ID from the Cloudflare dashboard here
-      "database_id": "PASTE-YOUR-DATABASE-ID-HERE"
+      "database_id": "0085f3dd-6c3e-46e2-93bf-22dc23481e6f"
     }
   ],
   "observability": { "enabled": true }
