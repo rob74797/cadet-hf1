@@ -419,6 +419,7 @@ textarea.bin{resize:vertical}
     </div>
     <p class="note" id="vMsg"></p>
     <input type="file" id="recIn" accept="audio/*" capture="user" hidden>
+    <input type="file" id="msgFile" accept="audio/*" hidden>
     <div class="btnrow"><button class="tb" id="vClose" type="button">CLOSE</button></div>
   </div></div>
 
@@ -547,7 +548,7 @@ for(let i=0;i<n;i++){let v=0;
 /*SHARED-END*/
 
 /* ===== test-site reporting ===== */
-const APP_VERSION='0.5-test';
+const APP_VERSION='0.6-test';
 const ONLINE=/^https?:$/.test(location.protocol)&&!/claude\.ai|claudeusercontent/.test(location.hostname);
 function send(path,body){if(!ONLINE)return Promise.reject(new Error('offline'));return fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
 /* ===== recorded speech clips (I/Q at 6 kHz, companded int8) ===== */
@@ -628,6 +629,36 @@ const BUILTIN=[
    {id:'alc',kind:'practice',points:3,check:'txMax',field:'alc',max:0.001,ok:'ALC stayed at zero, so the signal stayed clean and narrow.',no:'The ALC moved. On data that widens your signal and the far station cannot decode it.'}]}];
 
 let MISSIONS=BUILTIN.slice();
+/* band banks: segments a licence allows, by type (band plan as in GreenVoice band-plan.js) */
+function bankBands(lic){return BANDS.filter(b=>lic==='full'||b.k!=='5');}
+function bankRanges(bk){const out=[];for(const b of bankBands(bk.lic)){if(bk.bands&&!bk.bands.includes(b.k))continue;const t=bk.type;
+ if(t==='any'||b.k==='5'){out.push([b.lo,b.hi]);continue;}
+ if(b.k==='10'){if(t==='cw')out.push([b.lo,b.hi]);continue;}
+ if(t==='cw'){out.push([b.lo,b.seg]);continue;}
+ if(b.k==='28'){out.push([28300000,29300000],[29520000,29700000]);continue;}
+ out.push([b.seg,b.hi]);}return out;}
+function bankDesc(bk){const L={foundation:'Foundation',intermediate:'Intermediate',full:'Full'}[bk.lic];const T={any:'bands',phone:'phone (SSB) segments',cw:'CW and data segments'}[bk.type];const all=bankBands(bk.lic).length===(bk.bands||[]).length;return L+' '+T+(all?'':' on '+bk.bands.map(k=>BANDS.find(b=>b.k===k).name).join(', '));}
+/* message station placed by a mission */
+let MSGST=null;
+function decodeClip(r){const b=atob(r.iq);const n=b.length/2;const i=new Float32Array(n),q=new Float32Array(n);const dq=c=>{let v=c>127?c-256:c;v/=127;return Math.sign(v)*v*v*r.pk;};for(let j=0;j<n;j++){i[j]=dq(b.charCodeAt(2*j));q[j]=dq(b.charCodeAt(2*j+1));}const e=atob(r.env);const env=new Float32Array(e.length);for(let j=0;j<e.length;j++)env[j]=e.charCodeAt(j)/255;return{i,q,env,rate:r.rate,dur:r.dur};}
+function setMsgStation(msg){MSGST=null;delete CLIPS.msg;if(msg&&msg.f){if(msg.mode==='CW'&&msg.text)MSGST={id:'msg',type:'cw',f:msg.f,dbm:msg.dbm||-85,wpm:msg.wpm||15,text:String(msg.text).toUpperCase(),gap:msg.gap==null?6:msg.gap,seed:7};
+ else if(msg.audio){try{CLIPS.msg=decodeClip(msg.audio);MSGST={id:'msg',type:'ssb',sb:msg.mode==='USB'?'U':'L',f:msg.f,dbm:msg.dbm||-85,clip:'msg',seed:7,off:msg.gap==null?6:msg.gap};}catch(e){console.warn('message audio unreadable',e);}}}
+ post({type:'clips',clips:CLIPS});curBand=undefined;}
+/* turn a recording into band-limited I/Q at 6 kHz, the same format as the built-in voices */
+function fft(re,im,inv){const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t;}}
+ for(let len=2;len<=n;len<<=1){const a=(inv?2:-2)*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let j=0;j<len/2;j++){const ur=re[i+j],ui=im[i+j],k=i+j+len/2,vr=re[k]*cr-im[k]*ci,vi=re[k]*ci+im[k]*cr;re[i+j]=ur+vr;im[i+j]=ui+vi;re[k]=ur-vr;im[k]=ui-vi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t;}}}
+ if(inv)for(let i=0;i<n;i++){re[i]/=n;im[i]/=n;}}
+function toB64(u8){let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);}
+function makeVoiceClip(x,srcRate){const R=6000,step=srcRate/R,win=Math.max(1,Math.round(step));const n0=Math.min(Math.floor(x.length/step),R*20);const y=new Float64Array(n0);
+ for(let j=0;j<n0;j++){const c=Math.floor(j*step);let a=0,m=0;for(let k=c;k<c+win&&k<x.length;k++){a+=x[k];m++;}y[j]=m?a/m:0;}
+ let N=1;while(N<n0)N<<=1;const re=new Float64Array(N),im=new Float64Array(N);re.set(y);fft(re,im,false);
+ for(let k=0;k<N;k++){const f=(k<=N/2?k:k-N)*R/N;if(f<300||f>2900){re[k]=0;im[k]=0;}else{re[k]*=2;im[k]*=2;}}fft(re,im,true);
+ const w=R/10,nw=Math.floor(n0/w);const rms=new Float64Array(nw);let mx=0;for(let i=0;i<nw;i++){let a=0;for(let j=i*w;j<(i+1)*w;j++)a+=re[j]*re[j]+im[j]*im[j];rms[i]=Math.sqrt(a/w);if(rms[i]>mx)mx=rms[i];}
+ if(mx<1e-5)return null;let s0=0,s1=nw-1;while(s0<nw&&rms[s0]<mx*0.06)s0++;while(s1>s0&&rms[s1]<mx*0.06)s1--;s0=Math.max(0,s0-2);s1=Math.min(nw-1,s1+2);
+ const a0=s0*w,a1=(s1+1)*w,len=a1-a0,g=0.707/mx;let pk=0;for(let j=a0;j<a1;j++){pk=Math.max(pk,Math.abs(re[j]*g),Math.abs(im[j]*g));}
+ const iq=new Uint8Array(len*2);const cq=v=>{const c=Math.round(Math.sign(v)*Math.sqrt(Math.min(1,Math.abs(v)/pk))*127);return c<0?c+256:c;};for(let j=0;j<len;j++){iq[2*j]=cq(re[a0+j]*g);iq[2*j+1]=cq(im[a0+j]*g);}
+ const env=new Uint8Array(s1-s0+1);for(let i=s0;i<=s1;i++)env[i-s0]=Math.round(rms[i]/mx*255);
+ return{rate:R,pk:+pk.toFixed(4),iq:toB64(iq),env:toB64(env),dur:+(len/R).toFixed(3)};}
 function loadMissions(){if(!ONLINE)return;fetch('/api/missions').then(r=>r.ok?r.json():null).then(d=>{if(!d||!Array.isArray(d.missions))return;const ids=new Set(BUILTIN.map(m=>m.id));MISSIONS=BUILTIN.concat(d.missions.filter(m=>m&&m.id&&!ids.has(m.id)&&Array.isArray(m.rules)&&m.rules.length));if(!$('#ovMissions').hidden)buildMissions();}).catch(()=>{});}
 /* ===== state ===== */
 const DEF={dial:7150000,rit:0,mode:'LSB',step:100,af:30,rf:100,sql:0,mic:50,pwr:100,comp:0,fil:2400,shift:0,nb:false,nr:false,nrl:5,notch:false,agc:'F',pitch:600,preamp:10,bits:16,order:4,ant:'dipole',tuner:false,bpf:'auto',lpf:'auto',micDist:'normal',txLow:300,txHigh:2700,rise:5,dataMode:'narrow',span:20000,meter:'PO'};
@@ -669,7 +700,7 @@ function txInst(t){const tt=T;let e=0,po=0,alc=0,active=false;
 /* ===== params to the audio thread ===== */
 function params(){const b=curBand,w=S.dataMode==='wide';return{voice:S.voice,txT0:txT0,power:S.power,tx:S.tx,key:S.key,mon:S.mon,dial:S.dial,rit:S.rit,mode:S.mode,fil:S.fil,shift:S.shift,pitch:S.pitch,af:S.af,rf:S.rf,sql:S.sql,preamp:S.preamp,order:S.order,nb:S.nb,nr:S.nr,nrl:S.nrl,notch:S.notch,agc:S.agc,bits:S.bits,ant:S.ant,bpf:S.bpf,noise:b?b.noise:-112,imp:b?b.imp:0,rise:S.rise,radiate:T.radiate,themSnr:T.snrFull,driveLin:T.driveLin,driveDb:T.driveDb,overDb:T.overDb,comp:S.comp,txLow:S.txLow,txHigh:S.txHigh,dataNt:w?32:8,dataSp:w?31.25:6.25,dataBaud:w?31.25:6.25};}
 function pushNow(){needPush=false;post({type:'p',p:params()});}
-function updateBand(){const b=bandOf(S.dial);if(b!==curBand){curBand=b;curStations=b?ST[b.k].map(s=>Object.assign({},s)):[];post({type:'st',list:curStations});}}
+function updateBand(){const b=bandOf(S.dial);if(b!==curBand){curBand=b;curStations=b?ST[b.k].map(s=>Object.assign({},s)):[];if(b&&MSGST&&bandOf(MSGST.f)===b)curStations.push(Object.assign({},MSGST));post({type:'st',list:curStations});}}
 
 /* ===== audio ===== */
 async function initAudio(){
@@ -949,7 +980,7 @@ function drawLid(tt){const nowP=performance.now();allBlocks().forEach(b=>{const 
 /* ===== missions ===== */
 function snapshot(){const o={};for(const k in DEF)o[k]=S[k];return o;}
 function applyState(st){Object.assign(S,JSON.parse(JSON.stringify(DEF)),st);filBy={LSB:2400,USB:2400,CW:500,DATA:2500};filBy[S.mode]=S.fil=st.fil||filBy[S.mode];report='';cwDec.out='';dataDec.txt='';wfClear=true;knobs.fil.range();changed();}
-function startMission(m){MIS=m;applyState(m.start||{});A=m.id==='free'?null:{m,t0:now(),start:snapshot(),changes:[],txs:[]};$('#mTitle').textContent=m.title+(A?' · '+dispCall(save.id):'')+(m.test?' · TEST':'');$('#mBrief').textContent=m.brief;$('#bSubmit').hidden=m.id==='free';}
+function startMission(m){MIS=m;setMsgStation(m.msg);applyState(m.start||{});A=m.id==='free'?null:{m,t0:now(),start:snapshot(),changes:[],txs:[]};$('#mTitle').textContent=m.title+(A?' · '+dispCall(save.id):'')+(m.test?' · TEST':'');$('#mBrief').textContent=m.brief;$('#bSubmit').hidden=m.id==='free';}
 function buildMissions(){const h=$('#mList');h.innerHTML='';MISSIONS.forEach(m=>{const b=document.createElement('button');b.type='button';b.className='mc';const done=save.passed[m.id];b.innerHTML='<span class="mt">'+esc(m.title)+(done?'<span class="badge">PASSED</span>':'')+(m.custom?'<span class="badge" style="border-color:var(--cyan);color:var(--cyan)">NEW</span>':'')+'</span><span class="mb">'+esc(m.brief)+'</span><span class="mm">'+(m.id==='free'?'NOT SCORED':(m.rules.length+' CHECKS · ABOUT '+esc(m.time||'5 min')))+'</span>';b.addEventListener('click',()=>{sfx.click();$('#ovMissions').hidden=true;if(m.id==='free'){startMission(m);return;}openBrief(m);});h.appendChild(b);});}
 function openBrief(m){$('#brT').textContent=m.title;$('#brB').textContent=m.brief;$('#brCallF').hidden=false;$('#brCall').value=dispCall(save.id||'');$('#brErr').textContent='';$('#brGo').textContent='START MISSION';$('#ovBrief').hidden=false;
  $('#brGo').onclick=()=>{const c=normCall($('#brCall').value);if(!callOk(c)){$('#brErr').textContent='Enter your callsign (2 to 10 letters and numbers) so your instructor can see your result.';$('#brCall').focus();return;}save.id=c;lsSet('hf1.v1',save);$('#ovBrief').hidden=true;startMission(m);};setTimeout(()=>{if(!save.id)$('#brCall').focus();},60);}
@@ -972,7 +1003,8 @@ function evalRule(r,ans,ansHash){const fv=v=>fmtVal(r.field,v);const tx=A.txs;co
   case'max':{const ok=S[r.field]<=r.max;return[ok,fmtv(ok?r.ok:r.no,r.field==='fil'?S[r.field]:fv(S[r.field]))];}
   case'changed':{const ok=A.changes.some(c=>c.k===r.field)||S[r.field]!==A.start[r.field];return[ok,ok?r.ok:r.no];}
   case'unchanged':{const ok=S[r.field]===A.start[r.field];return[ok,ok?r.ok:r.no];}
-  case'rxOffset':{const st=(ST['7']||[]).concat(...Object.values(ST)).find(s=>s.id===r.station);const off=Math.round(Math.abs(S.dial+S.rit-st.f));const ok=off<=r.tol;return[ok,fmtv(ok?r.ok:r.no,off)];}
+  case'inRanges':{const v=S[r.field],ok=r.ranges.some(g=>v>=g[0]&&v<=g[1]);return[ok,fmtv(ok?r.ok:r.no,fv(v))];}
+  case'rxOffset':{const st=[].concat(...Object.values(ST),MSGST?[MSGST]:[]).find(s=>s.id===r.station);if(!st)return[false,'That station is not on the air.'];const off=Math.round(Math.abs(S.dial+S.rit-st.f));const ok=off<=r.tol;return[ok,fmtv(ok?r.ok:r.no,off)];}
   case'answer':{const a=normCall(ans);const ok=A.m.answerHash?(!!ansHash&&ansHash===A.m.answerHash):a===normCall(A.m.answer);return[ok,fmtv(ok?r.ok:r.no,dispCall(a)||'nothing')];}}
  return[false,''];}
 function finish(ans,ansHash){flushAll();const m=A.m;let pts=0,max=0,lic=false;const rows=m.rules.map(r=>{const[ok,msg]=evalRule(r,ans,ansHash);if(r.kind==='licence'){if(!ok)lic=true;}else{max+=r.points;if(ok)pts+=r.points;}return{r,ok,msg};});
@@ -994,7 +1026,7 @@ const NUMF=new Set(['dial','rit','fil','shift','pwr','mic','comp','af','rf','sql
 const BOOLF=new Set(['nb','nr','notch','tuner']);
 const LICT={foundation:{n:'Foundation',pep:25,r:FOUNDATION},intermediate:{n:'Intermediate',pep:100,r:FOUNDATION},full:{n:'Full',pep:100,r:BANDS.map(b=>[b.lo,b.hi])}};
 const MATCH=[['ignore','Ignore'],['exact','Exact'],['anyof','Any of'],['range','Range'],['max','At most'],['min','At least'],['unchanged','Must not change'],['changed','Must use']];
-function newB(){return{id:'',title:'',brief:'',question:'',answer:'',ansHash:'',time:'5 min',start:null,ans:null,f:{},tx:{req:true,lic:'foundation',alc:false,segLo:'',segHi:'',station:'',tol:50},pass:'',all:false};}
+function newB(){return{id:'',title:'',brief:'',question:'',answer:'',ansHash:'',time:'5 min',start:null,ans:null,f:{},tx:{req:true,lic:'foundation',alc:false,segLo:'',segHi:'',station:'',tol:50,bankOn:false,bank:{lic:'foundation',type:'phone',bands:bankBands('foundation').map(b=>b.k)}},msg:{on:false,f:'',mode:'LSB',dbm:-85,gap:6,wpm:15,text:'',audio:null},pass:'',all:false};}
 let B=newB();try{const k=sessionStorage.getItem('hf1key');if(k)$('#bKey').value=k;}catch(e){}
 const showV=(k,v)=>v===undefined||v===null?'':k==='dial'?(v/1e6).toFixed(4):BOOLF.has(k)?(v?'on':'off'):String(v);
 function parseV(k,t){t=String(t==null?'':t).trim();if(k==='dial')return Math.round(parseFloat(t)*1e6);if(NUMF.has(k))return Number(t);if(BOOLF.has(k))return /^(on|true|yes|1)$/i.test(t);if(k==='mode')return t.toUpperCase();return t;}
@@ -1007,6 +1039,7 @@ function buildRules(){const rules=[];let n=0;const id=p=>(p+(++n)).slice(0,24);
   else if(f.m==='range'){const lo=parseV(k,f.a),hi=parseV(k,f.b);rules.push(Object.assign(base,{check:'range',min:Math.min(lo,hi),max:Math.max(lo,hi),ok:lab+' at {v}, inside the range.',no:lab+' at {v}. It needed to be between '+fmtVal(k,Math.min(lo,hi))+' and '+fmtVal(k,Math.max(lo,hi))+'.'}));}
   else if(f.m==='max'){const v=parseV(k,f.a);rules.push(Object.assign(base,{check:'max',max:v,ok:lab+' at {v}, no more than '+fmtVal(k,v)+'.',no:lab+' at {v}. It should be no more than '+fmtVal(k,v)+'.'}));}
   else if(f.m==='min'){const v=parseV(k,f.a);rules.push(Object.assign(base,{check:'min',min:v,ok:lab+' at {v}, at least '+fmtVal(k,v)+'.',no:lab+' at {v}. It should be at least '+fmtVal(k,v)+'.'}));}
+  else if(f.m==='bank'&&f.bank){const rg=bankRanges(f.bank),d=bankDesc(f.bank);rules.push(Object.assign(base,{check:'inRanges',ranges:rg,ok:lab+' at {v}, inside the '+d+'.',no:lab+' at {v} is outside the '+d+'.'}));}
   else if(f.m==='unchanged')rules.push(Object.assign(base,{check:'unchanged',ok:lab+' left as it was.',no:lab+' was changed. This one should stay as it was.'}));
   else if(f.m==='changed')rules.push(Object.assign(base,{check:'changed',ok:'You used '+lab+'.',no:lab+' is the control to use here.'}));}
  const L=LICT[B.tx.lic];
@@ -1015,24 +1048,35 @@ function buildRules(){const rules=[];let n=0;const id=p=>(p+(++n)).slice(0,24);
   rules.push({id:id('clean'),kind:'licence',check:'txMax',field:'splatter',max:0,ok:'Clean signal with no splatter.',no:'You overdrove the transmitter and splattered onto your neighbours.'});}
  else if(B.tx.req)rules.push({id:id('tx'),kind:'practice',points:1,check:'txMax',field:'pep',max:100000,ok:'You made a test transmission.',no:'You did not make a test transmission.'});
  if(B.tx.alc)rules.push({id:id('alc'),kind:'practice',points:3,check:'txMax',field:'alc',max:0.001,ok:'ALC stayed at zero.',no:'The ALC moved. Keep it at zero.'});
+ if(B.tx.bankOn){const d=bankDesc(B.tx.bank);rules.push({id:id('bank'),kind:'practice',points:2,check:'txInside',ranges:bankRanges(B.tx.bank),ok:'Your whole signal stayed inside the '+d+'.',no:'Your signal reached {edge}, outside the '+d+'.'});}
  const sl=parseFloat(B.tx.segLo),sh=parseFloat(B.tx.segHi);if(sl>0&&sh>0){const lo=Math.round(Math.min(sl,sh)*1e6),hi=Math.round(Math.max(sl,sh)*1e6);rules.push({id:id('seg'),kind:'practice',points:2,check:'txInside',ranges:[[lo,hi]],ok:'Your signal stayed between '+(lo/1e6).toFixed(3)+' and '+(hi/1e6).toFixed(3)+' MHz.',no:'You transmitted at {edge}, outside the part of the band this needs.'});}
  if(B.tx.station)rules.push({id:id('stn'),kind:'practice',points:3,check:'rxOffset',station:B.tx.station,tol:Math.max(5,+B.tx.tol||50),ok:'Tuned onto the station.',no:'You finished {v} Hz away from the station.'});
  if(B.question&&(B.answer||B.ansHash))rules.push({id:id('ans'),kind:'practice',points:5,check:'answer',ok:'Correct answer.',no:'You answered {v}. That is not right.'});
  return rules;}
-function stateCheck(r,st){const v=st[r.field];if(r.check==='setting')return r.anyOf.includes(v);if(r.check==='range')return v>=r.min&&v<=r.max;if(r.check==='max')return v<=r.max;if(r.check==='min')return v>=r.min;return null;}
+function stateCheck(r,st){const v=st[r.field];if(r.check==='inRanges')return r.ranges.some(g=>v>=g[0]&&v<=g[1]);if(r.check==='setting')return r.anyOf.includes(v);if(r.check==='range')return v>=r.min&&v<=r.max;if(r.check==='max')return v<=r.max;if(r.check==='min')return v>=r.min;return null;}
 function bReview(){const rules=buildRules();const total=rules.reduce((a,r)=>a+(r.kind==='licence'?0:r.points||0),0);const pass=B.pass!==''?Math.max(0,Math.round(+B.pass)):Math.max(1,Math.round(total*0.7));const errs=[],warns=[];
  if(!B.title.trim())errs.push('Give the mission a title.');if(!B.brief.trim())errs.push('Write the brief the cadet will read.');if(!B.start)errs.push('Capture the starting state.');if(!rules.length)errs.push('Add at least one check.');if(B.question&&!B.answer&&!B.ansHash)errs.push('You asked a question, so add the answer.');if(pass>total)errs.push('The pass mark ('+pass+') is higher than the total points ('+total+').');
- const sr=rules.filter(r=>['setting','range','max','min'].includes(r.check));
+ const sr=rules.filter(r=>['setting','range','max','min','inRanges'].includes(r.check));
+ const M=B.msg;if(M.on){const f=Math.round(parseFloat(M.f)*1e6);if(!(f>=1800000&&f<=30000000))errs.push('Give the message station a frequency between 1.8 and 30 MHz.');else if(!bandOf(f))errs.push('Put the message station inside an amateur band.');if(M.mode==='CW'&&!M.text.trim())errs.push('Type the CW message.');if(M.mode!=='CW'&&!M.audio)errs.push('Record or load the voice message.');}
  if(B.ans){const bad=sr.filter(r=>stateCheck(r,B.ans)===false);if(bad.length)warns.push('Your own captured answer fails: '+bad.map(r=>BLAB[r.field]).join(', ')+'.');}
  if(B.start&&sr.length&&sr.every(r=>stateCheck(r,B.start)))warns.push('The starting state already passes every settings check.');
  if(sr.length>=3&&sr.every(r=>r.check==='setting'))warns.push('Every settings check is an exact match. A range lets cadets reach the answer in different ways.');
  const L=LICT[B.tx.lic];if(L&&B.ans){if(B.ans.pwr>L.pep)warns.push('Your answer uses '+B.ans.pwr+' W, above the '+L.pep+' W '+L.n+' limit.');if(!L.r.some(g=>B.ans.dial>=g[0]+3000&&B.ans.dial<=g[1]-3000))warns.push('Your answer frequency is at or outside a band edge for a '+L.n+' licence.');}
+ const dr=rules.find(r=>r.check==='inRanges'&&r.field==='dial'),sr2=rules.find(r=>r.check==='rxOffset');if(dr&&sr2){const st=sr2.station==='msg'?{f:Math.round(parseFloat(B.msg.f)*1e6)}:[].concat(...Object.values(ST)).find(x=>x.id===sr2.station);if(st&&!dr.ranges.some(g=>st.f>=g[0]&&st.f<=g[1]))warns.push('The station they must tune onto is outside the MAIN DIAL band bank, so nobody can pass both. Check the dial on transmission instead (step 4), or change the bank.');}
  if(rules.some(r=>r.check==='unchanged'&&r.field==='dial')&&B.start&&B.ans&&B.start.dial!==B.ans.dial)warns.push('MAIN DIAL is set to "must not change" but your answer moved it.');
  return{rules,total,pass,errs,warns};}
-function bStations(){const st=B.ans||B.start||snapshot();const b=bandOf(st.dial);const f=st.dial+(st.rit||0);return b?ST[b.k].filter(s=>s.type!=='bc').map(s=>({s,d:Math.abs(s.f-f)})).sort((a,b)=>a.d-b.d):[];}
+function bStations(){const st=B.ans||B.start||snapshot();const b=bandOf(st.dial);const f=st.dial+(st.rit||0);const list=b?ST[b.k].filter(s=>s.type!=='bc'):[];const mf=Math.round(parseFloat(B.msg.f)*1e6);if(B.msg.on&&mf&&bandOf(mf)===b)list.unshift({id:'msg',type:B.msg.mode==='CW'?'cw':'ssb',f:mf,clip:'your message'});return list.map(s=>({s,d:Math.abs(s.f-f)})).sort((a,b)=>(a.s.id==='msg'?-1:0)||a.d-b.d);}
+function msgUI(){const M=B.msg;const sel=(attr,opts,cur,name)=>'<select class="bsel" '+attr+' aria-label="'+name+'">'+opts.map(o=>'<option value="'+o[0]+'"'+(String(cur)===String(o[0])?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
+ let h='<div class="bsec"><h3>5 · MESSAGE STATION (OPTIONAL)</h3><label class="chk"><input type="checkbox" data-m="on"'+(M.on?' checked':'')+'>Put a station on the air sending a message for the cadet to find</label>';
+ if(!M.on)return h+'</div>';
+ h+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><label class="blab">FREQUENCY (MHz)<input class="bin" data-m="f" value="'+esc(M.f)+'" placeholder="7.135"></label><label class="blab">SENDS'+sel('data-m="mode"',[['LSB','Voice · LSB'],['USB','Voice · USB'],['CW','CW (Morse)']],M.mode,'Mode')+'</label><label class="blab">STRENGTH'+sel('data-m="dbm"',[[-67,'Strong · S9+6'],[-79,'Good · S8'],[-91,'Fair · S6'],[-103,'Weak · S4']],M.dbm,'Strength')+'</label><label class="blab">PAUSE BETWEEN REPEATS (s)<input class="bin" data-m="gap" value="'+esc(M.gap)+'"></label></div>';
+ if(M.mode==='CW')h+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><label class="blab" style="flex:1;min-width:280px">MESSAGE<input class="bin w" data-m="text" maxlength="200" value="'+esc(M.text)+'" placeholder="e.g. CQ DE GB4CIS MEET AT GRID 123456"></label><label class="blab">SPEED (wpm)<input class="bin" data-m="wpm" value="'+esc(M.wpm)+'"></label></div>';
+ else h+='<div class="crow" style="margin-top:8px"><button type="button" class="tb'+(recOn?' accent':'')+'" data-act="rec">'+(recOn?'■ STOP RECORDING':'● RECORD WITH MY MIC')+'</button><button type="button" class="tb" data-act="recfile">LOAD A CLIP</button>'+(M.audio?'<button type="button" class="tb" data-act="recplay">▶ HEAR IT</button><span class="note" style="margin:0">'+M.audio.dur.toFixed(1)+' s message ready</span>':'<span class="note" style="margin:0">Up to 20 seconds. Speak clearly; it goes on air like a real station.</span>')+'</div>';
+ return h+'<p class="note">To make the cadet find it, choose it under MUST BE TUNED ONTO, and add a question about the message in DETAILS.</p></div>';}
+function bankUI(where,bk){const bands=bankBands(bk.lic);return'<span style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;gap:6px;flex-wrap:wrap"><select class="bsel" data-bank="'+where+'" data-p="lic" aria-label="Licence">'+[['foundation','Foundation'],['intermediate','Intermediate'],['full','Full']].map(o=>'<option value="'+o[0]+'"'+(bk.lic===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><select class="bsel" data-bank="'+where+'" data-p="type" aria-label="Segment type">'+[['phone','Phone (SSB)'],['cw','CW and data'],['any','Any mode']].map(o=>'<option value="'+o[0]+'"'+(bk.type===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></span><span style="display:flex;gap:4px 10px;flex-wrap:wrap">'+bands.map(b=>'<label class="chk" style="font-size:13px"><input type="checkbox" data-bank="'+where+'" data-p="band" value="'+b.k+'"'+(bk.bands.includes(b.k)?' checked':'')+'>'+b.name+'</label>').join('')+'</span></span>';}
 function renderB(){const rv=bReview();const sel=(name,opts,cur,attr)=>'<select class="bsel" '+attr+' aria-label="'+name+'">'+opts.map(o=>'<option value="'+o[0]+'"'+(String(cur)===String(o[0])?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
  let rows='';if(B.ans){for(const[k,lab]of BF){const f=B.f[k]||(B.f[k]={m:'ignore',a:showV(k,B.ans[k]),b:'',kind:'practice',pts:2});const ch=B.start&&B.start[k]!==B.ans[k];if(!B.all&&!ch&&f.m==='ignore')continue;const needA=['exact','anyof','range','max','min'].includes(f.m);
-  rows+='<tr class="'+(f.m!=='ignore'?'on':'')+'"><td>'+lab+'</td><td class="v">'+esc(showV(k,B.start&&B.start[k]))+'</td><td class="v">'+esc(showV(k,B.ans[k]))+'</td><td>'+sel('Check for '+lab,MATCH,f.m,'data-f="'+k+':m"')+'</td><td>'+(needA?'<input class="bin" data-f="'+k+':a" value="'+esc(f.a)+'" aria-label="'+lab+' value"'+(k==='dial'?' placeholder="MHz"':'')+'>':'')+(f.m==='range'?' to <input class="bin" data-f="'+k+':b" value="'+esc(f.b)+'" aria-label="'+lab+' upper value">':'')+'</td><td>'+(f.m==='ignore'?'':sel('Kind for '+lab,[['practice','Good practice'],['efficiency','Efficiency'],['licence','Licence (must pass)']],f.kind,'data-f="'+k+':kind"'))+'</td><td>'+(f.m==='ignore'||f.kind==='licence'?'':'<input class="bin" style="width:50px" data-f="'+k+':pts" value="'+esc(f.pts)+'" aria-label="Points for '+lab+'">')+'</td></tr>';}}
+  rows+='<tr class="'+(f.m!=='ignore'?'on':'')+'"><td>'+lab+'</td><td class="v">'+esc(showV(k,B.start&&B.start[k]))+'</td><td class="v">'+esc(showV(k,B.ans[k]))+'</td><td>'+sel('Check for '+lab,k==='dial'?MATCH.concat([['bank','In a band bank']]):MATCH,f.m,'data-f="'+k+':m"')+'</td><td>'+(f.m==='bank'?bankUI('dial',f.bank):'')+(needA?'<input class="bin" data-f="'+k+':a" value="'+esc(f.a)+'" aria-label="'+lab+' value"'+(k==='dial'?' placeholder="MHz"':'')+'>':'')+(f.m==='range'?' to <input class="bin" data-f="'+k+':b" value="'+esc(f.b)+'" aria-label="'+lab+' upper value">':'')+'</td><td>'+(f.m==='ignore'?'':sel('Kind for '+lab,[['practice','Good practice'],['efficiency','Efficiency'],['licence','Licence (must pass)']],f.kind,'data-f="'+k+':kind"'))+'</td><td>'+(f.m==='ignore'||f.kind==='licence'?'':'<input class="bin" style="width:50px" data-f="'+k+':pts" value="'+esc(f.pts)+'" aria-label="Points for '+lab+'">')+'</td></tr>';}}
  const stOpts=[['','None']].concat(bStations().map(x=>[x.s.id,x.s.type.toUpperCase()+' '+fmtF(x.s.f)+(x.s.clip?' ('+x.s.clip+')':'')+(x.d<3000?' · '+Math.round(x.d)+' Hz from answer':'')]));
  $('#bldBody').innerHTML=
  '<div class="bsec" style="border:0;margin-top:6px"><h3>1 · DETAILS</h3><div class="bgrid"><label class="blab">TITLE<input class="bin w" data-b="title" maxlength="60" value="'+esc(B.title)+'"></label><label class="blab">TIME TO ALLOW<input class="bin w" data-b="time" maxlength="12" value="'+esc(B.time)+'"></label></div>'
@@ -1045,16 +1089,30 @@ function renderB(){const rv=bReview();const sel=(name,opts,cur,attr)=>'<select c
  +'<label class="blab">LICENCE RULES'+sel('Licence rules',[['none','None'],['foundation','Foundation · 25 W'],['intermediate','Intermediate · 100 W'],['full','Full · radio max 100 W']],B.tx.lic,'data-t="lic"')+'</label>'
  +(B.tx.lic==='none'?'<label class="chk"><input type="checkbox" data-t="req"'+(B.tx.req?' checked':'')+'>Needs a test transmission</label>':'')
  +'<label class="chk"><input type="checkbox" data-t="alc"'+(B.tx.alc?' checked':'')+'>ALC must stay at zero</label>'
- +'<label class="blab">SIGNAL MUST STAY BETWEEN (MHz)<span><input class="bin" data-t="segLo" value="'+esc(B.tx.segLo)+'" placeholder="7.000"> and <input class="bin" data-t="segHi" value="'+esc(B.tx.segHi)+'" placeholder="7.050"></span></label></div>'
+ +'<label class="chk"><input type="checkbox" data-t="bankOn"'+(B.tx.bankOn?' checked':'')+'>Signal must stay inside a band bank</label>'
+ +'<label class="blab">OR BETWEEN (MHz)<span><input class="bin" data-t="segLo" value="'+esc(B.tx.segLo)+'" placeholder="7.000"> and <input class="bin" data-t="segHi" value="'+esc(B.tx.segHi)+'" placeholder="7.050"></span></label></div>'
+ +(B.tx.bankOn?'<div style="margin-top:8px">'+bankUI('tx',B.tx.bank)+'</div>':'')
  +'<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"><label class="blab">MUST BE TUNED ONTO'+sel('Station to tune onto',stOpts,B.tx.station,'data-t="station"')+'</label><label class="blab">WITHIN (Hz)<input class="bin" data-t="tol" value="'+esc(B.tx.tol)+'"></label></div></div>'
- +'<div class="bsec"><h3>5 · SCORING AND CHECKS</h3><div id="bScore"></div></div>';
+ +msgUI()
+ +'<div class="bsec"><h3>6 · SCORING AND CHECKS</h3><div id="bScore"></div></div>';
  bScore();}
 function bScore(){const rv=bReview();$('#bScore').innerHTML='<div class="crow"><span style="font:15px var(--f-text)">'+rv.rules.length+' checks · '+rv.total+' points · licence checks must all pass</span><label for="bPass" style="margin-left:12px">PASS MARK</label><input id="bPass" class="bin" style="width:60px" data-b="pass" value="'+esc(B.pass)+'" placeholder="'+rv.pass+'"></div>'+rv.errs.map(e=>'<p class="err">✗ '+esc(e)+'</p>').join('')+rv.warns.map(w=>'<p class="warn">! '+esc(w)+'</p>').join('')+(!rv.errs.length&&!rv.warns.length?'<p class="note" style="color:var(--good)">✓ Ready to test and save.</p>':'');}
-$('#bldBody').addEventListener('input',e=>{const el=e.target;if(el.dataset.b){B[el.dataset.b]=el.value;if(el.dataset.b!=='pass')bScoreSoon();else bScoreKeep();}else if(el.dataset.f&&el.tagName==='INPUT'){const[k,p]=el.dataset.f.split(':');B.f[k][p]=el.value;bScoreSoon();}else if(el.dataset.t&&el.tagName==='INPUT'&&el.type!=='checkbox'){B.tx[el.dataset.t]=el.value;bScoreSoon();}});
-$('#bldBody').addEventListener('change',e=>{const el=e.target;if(el.dataset.f&&el.tagName==='SELECT'){const[k,p]=el.dataset.f.split(':');const f=B.f[k];f[p]=el.value;if(p==='m'&&['exact','anyof','max','min','range'].includes(el.value)&&!f.a)f.a=showV(k,B.ans[k]);renderB();}else if(el.dataset.t&&(el.tagName==='SELECT'||el.type==='checkbox')){B.tx[el.dataset.t]=el.type==='checkbox'?el.checked:el.value;renderB();}});
+$('#bldBody').addEventListener('input',e=>{const el=e.target;if(el.dataset.b){B[el.dataset.b]=el.value;if(el.dataset.b!=='pass')bScoreSoon();else bScoreKeep();}else if(el.dataset.f&&el.tagName==='INPUT'){const[k,p]=el.dataset.f.split(':');B.f[k][p]=el.value;bScoreSoon();}else if(el.dataset.t&&el.tagName==='INPUT'&&el.type!=='checkbox'){B.tx[el.dataset.t]=el.value;bScoreSoon();}else if(el.dataset.m&&el.tagName==='INPUT'&&el.type!=='checkbox'){B.msg[el.dataset.m]=el.value;bScoreSoon();}});
+$('#bldBody').addEventListener('change',e=>{const el=e.target;
+ if(el.dataset.bank){const bk=el.dataset.bank==='dial'?B.f.dial.bank:B.tx.bank;const p=el.dataset.p;if(p==='band'){bk.bands=el.checked?Array.from(new Set(bk.bands.concat(el.value))):bk.bands.filter(k=>k!==el.value);}else{bk[p]=el.value;if(p==='lic'){const ok=bankBands(bk.lic).map(b=>b.k);bk.bands=bk.bands.filter(k=>ok.includes(k));if(!bk.bands.length)bk.bands=ok;if(bk.lic==='full'&&!bk.bands.includes('5'))bk.bands.push('5');}}renderB();return;}
+ if(el.dataset.m&&(el.tagName==='SELECT'||el.type==='checkbox')){B.msg[el.dataset.m]=el.type==='checkbox'?el.checked:(el.dataset.m==='dbm'?+el.value:el.value);renderB();return;}
+ if(el.dataset.f&&el.tagName==='SELECT'){const[k,p]=el.dataset.f.split(':');const f=B.f[k];f[p]=el.value;if(p==='m'&&el.value==='bank'&&!f.bank)f.bank={lic:B.tx.lic!=='none'?B.tx.lic:'foundation',type:'phone',bands:bankBands(B.tx.lic==='full'?'full':'foundation').map(b=>b.k)};if(p==='m'&&['exact','anyof','max','min','range'].includes(el.value)&&!f.a)f.a=showV(k,B.ans[k]);renderB();}else if(el.dataset.t&&(el.tagName==='SELECT'||el.type==='checkbox')){B.tx[el.dataset.t]=el.type==='checkbox'?el.checked:el.value;renderB();}});
 let bT=0;function bScoreSoon(){clearTimeout(bT);bT=setTimeout(bScoreKeep,250);}
 function bScoreKeep(){const a=document.activeElement,id=a&&a.id,pos=a&&a.selectionStart;bScore();if(id==='bPass'){const p=$('#bPass');p.focus();try{p.setSelectionRange(pos,pos);}catch(e){}}}
-$('#bldBody').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='all'){B.all=!B.all;renderB();}else if(b.dataset.act==='cap'){$('#ovBuild').hidden=true;showBar();}});
+$('#bldBody').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='all'){B.all=!B.all;renderB();}else if(b.dataset.act==='cap'){$('#ovBuild').hidden=true;showBar();}else if(b.dataset.act==='rec')toggleRec();else if(b.dataset.act==='recfile')$('#msgFile').click();else if(b.dataset.act==='recplay')playMsg();});
+let recOn=false,recSt=null,recNode=null,recSrc=null,recBuf=[],recRate=48000,recTimer=0;
+async function toggleRec(){if(recOn){stopRec();return;}if(!actx){$('#bMsg').textContent='Switch the radio on first, then record.';return;}
+ try{recSt=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}catch(e){$('#bMsg').textContent='The microphone is blocked here. Use LOAD A CLIP instead.';return;}
+ recSrc=actx.createMediaStreamSource(recSt);recNode=actx.createScriptProcessor(4096,1,1);recBuf=[];recRate=actx.sampleRate;recNode.onaudioprocess=ev=>{recBuf.push(new Float32Array(ev.inputBuffer.getChannelData(0)));ev.outputBuffer.getChannelData(0).fill(0);};const mute=actx.createGain();mute.gain.value=0;recSrc.connect(recNode);recNode.connect(mute);mute.connect(actx.destination);recOn=true;renderB();$('#bMsg').textContent='Recording… speak your message, then press STOP.';recTimer=setTimeout(stopRec,20000);}
+function stopRec(){clearTimeout(recTimer);recOn=false;try{recSrc.disconnect();recNode.disconnect();recSt.getTracks().forEach(t=>t.stop());}catch(e){}let n=0;recBuf.forEach(b=>n+=b.length);const x=new Float32Array(n);let o=0;recBuf.forEach(b=>{x.set(b,o);o+=b.length;});recBuf=[];useVoice(x,recRate);}
+function useVoice(x,rate){const c=makeVoiceClip(x,rate);if(!c){$('#bMsg').textContent='That recording was silent. Try again closer to the mic.';renderB();return;}B.msg.audio=c;$('#bMsg').textContent='Message ready: '+c.dur.toFixed(1)+' s. Press HEAR IT to check it.';renderB();}
+function playMsg(){if(!actx||!B.msg.audio)return;const c=decodeClip(B.msg.audio);const buf=actx.createBuffer(1,c.i.length,c.rate);buf.getChannelData(0).set(c.i);const s=actx.createBufferSource();s.buffer=buf;const g=actx.createGain();g.gain.value=0.5;s.connect(g).connect(uiGain);s.start();}
+$('#msgFile').addEventListener('change',async e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;if(!actx){$('#bMsg').textContent='Switch the radio on first.';return;}try{const ab=await actx.decodeAudioData(await f.arrayBuffer());useVoice(ab.getChannelData(0),ab.sampleRate);}catch(err){$('#bMsg').textContent='That file could not be played. Try M4A, MP3 or WAV.';}});
 function showBar(){$('#bBarT').textContent=!B.start?'Set the radio up the way the cadet should find it, then press CAPTURE START.':'Now set the radio up correctly and press CAPTURE ANSWER. Capturing again replaces the old one.';$('#bBar').hidden=false;}
 function openBuilder(){$('#bBar').hidden=true;$('#bMsg').textContent='';renderB();$('#ovBuild').hidden=false;}
 $('#bBuild').addEventListener('click',()=>{sfx.click();openBuilder();});
@@ -1069,8 +1127,9 @@ async function missionFromB(forSave){const rv=bReview();if(rv.errs.length){$('#b
  if(!B.id)B.id=(B.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'mission')+'-'+Math.random().toString(36).slice(2,6);
  const start={};for(const k in DEF)if(B.start[k]!==undefined)start[k]=B.start[k];
  const m={id:B.id,title:B.title.trim(),brief:B.brief.trim(),start,rules:rv.rules,pass:rv.pass,time:B.time.trim()||'5 min'};
+ if(B.msg.on){const M=B.msg;m.msg={f:Math.round(parseFloat(M.f)*1e6),mode:M.mode,dbm:+M.dbm||-85,gap:Math.max(0,Math.min(60,+M.gap||0)),wpm:Math.max(5,Math.min(40,+M.wpm||15))};if(M.mode==='CW')m.msg.text=M.text.trim().toUpperCase();else m.msg.audio=M.audio;}
  if(B.question){m.question=B.question.trim();if(B.answer){const a=normCall(B.answer);if(forSave)m.answerHash=await sha256(a);else m.answer=a;}else if(B.ansHash)m.answerHash=B.ansHash;}
- if(forSave){const copy=JSON.parse(JSON.stringify(B));delete copy.answer;copy.ansHash=m.answerHash||'';m.builder=copy;}
+ if(forSave){const copy=JSON.parse(JSON.stringify(B));delete copy.answer;if(copy.msg)copy.msg.audio=null;copy.ansHash=m.answerHash||'';m.builder=copy;}
  return m;}
 $('#bTest').addEventListener('click',async()=>{const m=await missionFromB(false);if(!m)return;m.test=true;$('#ovBuild').hidden=true;if(!callOk(save.id||'')){save.id='TEST';}startMission(m);$('#bBar').hidden=false;$('#bBarT').textContent='Testing as a cadet. SUBMIT to see the result, then OPEN BUILDER to carry on.';});
 $('#bSave').addEventListener('click',async()=>{const key=$('#bKey').value.trim();if(!key){$('#bMsg').textContent='Enter the admin key first.';return;}const m=await missionFromB(true);if(!m)return;$('#bMsg').textContent='Saving…';
@@ -1079,7 +1138,7 @@ $('#bSave').addEventListener('click',async()=>{const key=$('#bKey').value.trim()
 let savedRows=[];
 async function refreshLoad(){const key=$('#bKey').value.trim();if(!key||!ONLINE)return;try{const r=await fetch('/api/admin/data?limit=1',{headers:{authorization:'Bearer '+key}});if(!r.ok)return;const d=await r.json();savedRows=d.missions||[];$('#bLoad').innerHTML='<option value="">LOAD SAVED…</option>'+savedRows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.title)+(x.active?'':' (off)')+'</option>').join('');}catch(e){}}
 $('#bLoad').addEventListener('focus',refreshLoad);
-$('#bLoad').addEventListener('change',e=>{const row=savedRows.find(x=>x.id===e.target.value);e.target.value='';if(!row)return;let d={};try{d=JSON.parse(row.data);}catch(x){}const b=d.builder||{};B=Object.assign(newB(),b,{id:row.id,title:row.title,brief:d.brief||'',start:d.start||b.start||null,question:d.question||'',answer:'',ansHash:d.answerHash||'',time:d.time||'5 min',pass:String(d.pass==null?'':d.pass)});B.tx=Object.assign(newB().tx,b.tx||{});B.f=b.f||{};renderB();$('#bMsg').textContent='Loaded "'+row.title+'". Saving updates it in place.'+(d.builder?'':' It has no builder details, so its checks will be rebuilt from this page.');});
+$('#bLoad').addEventListener('change',e=>{const row=savedRows.find(x=>x.id===e.target.value);e.target.value='';if(!row)return;let d={};try{d=JSON.parse(row.data);}catch(x){}const b=d.builder||{};B=Object.assign(newB(),b,{id:row.id,title:row.title,brief:d.brief||'',start:d.start||b.start||null,question:d.question||'',answer:'',ansHash:d.answerHash||'',time:d.time||'5 min',pass:String(d.pass==null?'':d.pass)});B.tx=Object.assign(newB().tx,b.tx||{});B.f=b.f||{};B.msg=Object.assign(newB().msg,b.msg||{});if(d.msg&&d.msg.audio)B.msg.audio=d.msg.audio;renderB();$('#bMsg').textContent='Loaded "'+row.title+'". Saving updates it in place.'+(d.builder?'':' It has no builder details, so its checks will be rebuilt from this page.');});
 if(BUILDER){$('#bBuild').hidden=false;}
 
 /* station log */

@@ -9,7 +9,7 @@
 const BUILTIN_MISSIONS = new Set(['foundation40', 'rit', 'beacon', 'data']);
 const ROLES = new Set(['cadet', 'instructor', 'other']);
 const MAX_BODY = 12 * 1024;
-const MAX_MISSION = 48 * 1024;
+const MAX_MISSION = 420 * 1024; // room for a recorded voice message
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
 const CALL_RE = /^[A-Z0-9/]{2,10}$/;
 
@@ -118,7 +118,25 @@ async function listMissions(env) {
 }
 
 // A mission is stored as JSON. Check its shape so a bad save cannot break the radio for everyone.
-const CHECKS = new Set(['txMax', 'txInside', 'setting', 'max', 'min', 'range', 'changed', 'unchanged', 'rxOffset', 'answer']);
+const CHECKS = new Set(['txMax', 'txInside', 'setting', 'max', 'min', 'range', 'inRanges', 'changed', 'unchanged', 'rxOffset', 'answer']);
+const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
+function cleanMsg(m) {
+  if (!m || typeof m !== 'object') return undefined;
+  const f = int(m.f, 0, 30000000);
+  if (f < 1800000) return null;
+  const mode = ['LSB', 'USB', 'CW'].includes(m.mode) ? m.mode : null;
+  if (!mode) return null;
+  const out = { f, mode, dbm: int(m.dbm, -120, -40), gap: int(m.gap, 0, 60), wpm: int(m.wpm, 5, 40) };
+  if (mode === 'CW') {
+    out.text = str(m.text, 200).toUpperCase().replace(/[^A-Z0-9 /?=.,]/g, '');
+    if (!out.text) return null;
+  } else {
+    const a = m.audio || {};
+    if (a.rate !== 6000 || typeof a.iq !== 'string' || a.iq.length > 320000 || !B64.test(a.iq) || typeof a.env !== 'string' || a.env.length > 4000 || !B64.test(a.env)) return null;
+    out.audio = { rate: 6000, pk: Number(a.pk) || 1, iq: a.iq, env: a.env, dur: Math.min(20, Number(a.dur) || 0) };
+  }
+  return out;
+}
 const KINDS = new Set(['licence', 'practice', 'efficiency']);
 function cleanMission(b) {
   const id = str(b.id, 40).toLowerCase();
@@ -135,7 +153,7 @@ function cleanMission(b) {
     if (r.field !== undefined) c.field = str(r.field, 20);
     for (const k of ['max', 'min', 'tol']) if (r[k] !== undefined) c[k] = Number(r[k]);
     if (Array.isArray(r.anyOf)) c.anyOf = r.anyOf.slice(0, 12);
-    if (Array.isArray(r.ranges)) c.ranges = r.ranges.slice(0, 12).map(g => [Number(g[0]), Number(g[1])]);
+    if (Array.isArray(r.ranges)) c.ranges = r.ranges.slice(0, 24).map(g => [Number(g[0]), Number(g[1])]);
     if (r.station !== undefined) c.station = str(r.station, 12);
     rules.push(c);
   }
@@ -143,8 +161,10 @@ function cleanMission(b) {
   for (const [k, v] of Object.entries(b.start).slice(0, 40)) {
     if (/^[a-zA-Z]{1,12}$/.test(k) && ['number', 'string', 'boolean'].includes(typeof v)) start[k] = typeof v === 'string' ? v.slice(0, 12) : v;
   }
+  const msg = cleanMsg(b.msg);
+  if (msg === null) return { error: 'bad_message_station' };
   const data = {
-    brief, start, rules,
+    brief, start, rules, msg,
     pass: int(b.pass, 0, 200),
     time: str(b.time, 12) || '5 min',
     question: str(b.question, 200) || undefined,

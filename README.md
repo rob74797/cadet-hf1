@@ -77,14 +77,23 @@ Open the radio with `?builder` on the end of the address (for example `https://h
    | Must use | The control they should reach for |
    | Ignore | Anything that doesn't matter here |
 
+   | In a band bank (MAIN DIAL only) | Any frequency a licence allows, by type: phone (SSB), CW and data, or any mode. Tick the bands that count. |
+
    Each check is **Good practice** or **Efficiency** (worth points) or **Licence** (must pass).
 4. **Transmission and licence:**
    - The Foundation, Intermediate and Full templates add the power, band and clean-signal checks, measured on what was actually transmitted.
+   - **Signal must stay inside a band bank** checks the transmitted signal's edges against the same banks, so an LSB signal hanging over a band edge fails.
    - You can also require ALC at zero, keep the signal inside a frequency range, or require the cadet to be tuned onto a station.
-5. **Scoring:** the builder totals the points and suggests a pass mark of 70%. It warns you if:
+5. **Message station (optional):** put a station on any frequency inside an amateur band.
+   - **CW:** type the message and set the speed.
+   - **Voice:** record it with the builder's microphone (up to 20 seconds) or load a clip, and choose LSB or USB.
+   - Set its strength and the pause between repeats. It behaves like the other stations: it fades, it shifts when mistuned, and the wrong sideband loses it.
+   - Choose it under **Must be tuned onto** and ask a question about it in Details.
+6. **Scoring:** the builder totals the points and suggests a pass mark of 70%. It warns you if:
    - your own answer fails a check
    - the starting state already passes
    - every check is an exact match
+   - the station they must tune onto sits outside the dial's band bank
 
 Press **TEST AS CADET** to try it; test attempts are not saved. Enter the admin key and press **SAVE MISSION**. Testers see it the next time they open MISSIONS. **LOAD SAVED** brings a mission back to edit. On the results page you can hide, show or delete built missions.
 
