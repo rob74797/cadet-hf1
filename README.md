@@ -63,6 +63,7 @@ From now on, every commit to the repository redeploys the site automatically.
 
 On the test site the radio uses the cadet's **microphone** by default. The first PTT press asks permission. If it's refused, the radio falls back to the recorded test call.
 
+- **Mic check.** The first time the microphone is used on a device, the radio asks for a few words in a normal radio voice and sets an input trim, so normal speech sits at about 40% of full scale whatever the phone or laptop. Shouting still overdrives it. It's remembered on that device; redo it from the microphone block inside the lid.
 - **Meters follow the real voice.** PO, ALC and the splatter on the spectrum come from what the cadet actually says, for the test call and loaded clips too.
 - **LIFT LID** shows the cadet's own voice at every transmit stage: microphone, mic amplifier, ADC, compressor, modulator, PA, low-pass filter and antenna. The scopes label the peak level and turn red with **CLIPPING** when they overdrive.
 - **Transmit from inside the lid** with **HOLD TO TALK**, the space bar, or **VOX**. VOX transmits when you speak and drops back when you stop. VOX GAIN and VOX DELAY are on the microphone block inside the lid; the white mark on the MIC meter is the VOX threshold.
