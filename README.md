@@ -53,6 +53,23 @@ From now on, every commit to the repository redeploys the site automatically.
 1. Open the site, switch the radio on, and send a test from **FEEDBACK**.
 2. Open `/admin.html`, enter your admin key, and choose **LOAD**. Your test entry should appear.
 
+## Using it on a phone or tablet
+
+- **Knobs:** touch a knob and swipe up or right to turn it up, down or left to turn it down. Touching a knob also opens a large **adjust panel** at the top of the display with a full-width slider and − / + buttons; hold a button to keep stepping. The panel closes itself after a few seconds, or press ×.
+- **Main dial:** turn it round the edge, swipe across the middle, or use the swipe strip in its adjust panel. A quick flick keeps it spinning.
+- Turn the phone sideways, and use **full screen** (the top-right button) for the most room.
+
+## Your voice inside the radio
+
+On the test site the radio uses the cadet's **microphone** by default. The first PTT press asks permission. If it's refused, the radio falls back to the recorded test call.
+
+- **Meters follow the real voice.** PO, ALC and the splatter on the spectrum come from what the cadet actually says, for the test call and loaded clips too.
+- **LIFT LID** shows the cadet's own voice at every transmit stage: microphone, mic amplifier, ADC, compressor, modulator, PA, low-pass filter and antenna. The scopes label the peak level and turn red with **CLIPPING** when they overdrive.
+- **Transmit from inside the lid** with **HOLD TO TALK**, the space bar, or **VOX**. VOX transmits when you speak and drops back when you stop. VOX GAIN and VOX DELAY are on the microphone block inside the lid; the white mark on the MIC meter is the VOX threshold.
+- MIC GAIN, COMP and PWR can be changed on their blocks while talking, so cadets see each one's effect straight away.
+- While transmitting, the receive blocks go flat: the receiver is switched off.
+- Use headphones with VOX so the speaker doesn't key the transmitter.
+
 ## Callsigns
 
 Before a scored mission, the cadet enters their callsign. It's shown with Ø the way cadets write zero, and stored with a plain 0 so the same callsign always matches. The results page has a **Who has passed** grid with one row per callsign and one column per mission, plus a search box.
