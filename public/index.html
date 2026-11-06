@@ -270,6 +270,8 @@ button:focus-visible,.knob:focus-visible,#vfo:focus-visible{outline:2px solid va
 .field input,.fbta{-webkit-user-select:text;user-select:text}
 #fbRate button{min-width:44px}
 .tb:disabled{opacity:.5}
+a.tb{text-decoration:none}
+.gvBack{margin-right:auto}
 #bBar{position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:15;display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(40,29,12,.97);border:1px solid var(--amber);box-shadow:0 10px 30px rgba(0,0,0,.6)}
 #bBarT{font:600 14px/1.3 var(--f-text);color:var(--amber-soft);max-width:380px}
 .bsec{border-top:1px solid #2a3138;padding-top:10px;margin-top:12px}
@@ -414,7 +416,7 @@ textarea.bin{resize:vertical}
     <h2>MISSIONS</h2>
     <p class="sub">Using headphones? Keep your phone volume low: the radio has a locked limiter, but your phone volume sits after it. Each mission sets the radio up wrong. Fix it, make a test transmission where asked, then press SUBMIT. Scoring checks what your radio actually transmitted, not just where the knobs sit.</p>
     <div class="mgrid" id="mList"></div>
-    <div class="btnrow"><button class="tb" id="bMissClose" type="button">CLOSE</button></div>
+    <div class="btnrow"><a class="tb gvBack" href="https://greenvoice.ccistt.net/">◂ BACK TO GREENVOICE</a><button class="tb" id="bMissClose" type="button">CLOSE</button></div>
   </div></div>
 
   <div class="ov" id="ovBrief" hidden><div class="card" style="width:640px">
@@ -438,7 +440,7 @@ textarea.bin{resize:vertical}
     <div id="gvBox" class="who"></div>
     <div id="logBody"></div>
     <p class="note">Attempts are listed here on this phone. When you're logged in with GreenVoice, each mission result also goes to your instructor.</p>
-    <div class="btnrow"><button class="tb" id="logClose" type="button">CLOSE</button></div>
+    <div class="btnrow"><a class="tb gvBack" href="https://greenvoice.ccistt.net/">◂ BACK TO GREENVOICE</a><button class="tb" id="logClose" type="button">CLOSE</button></div>
   </div></div>
 
   <div class="ov" id="ovVoice" hidden><div class="card" style="width:660px">
@@ -1155,7 +1157,7 @@ async function flushSends(){if(flushing||!ONLINE||!(save.pending&&save.pending.l
    if(d&&d.retry)break;save.pending=save.pending.filter(x=>x.attemptId!==at.attemptId);lsSet('hf1.v1',save);}}
  finally{flushing=false;}}
 addEventListener('online',flushSends);
-if(ONLINE)fetch('/api/config').then(r=>r.ok?r.json():null).then(d=>{if(d&&/^https:\/\//.test(d.greenvoice||''))GV_URL=d.greenvoice;}).catch(()=>{});
+if(ONLINE)fetch('/api/config').then(r=>r.ok?r.json():null).then(d=>{if(d&&/^https:\/\//.test(d.greenvoice||'')){GV_URL=d.greenvoice;document.querySelectorAll('.gvBack').forEach(a=>a.href=GV_URL+'/');}}).catch(()=>{});
 
 /* ===== mission builder (open the site with ?builder) ===== */
 const BUILDER=/[?&]builder\b/.test(location.search);
