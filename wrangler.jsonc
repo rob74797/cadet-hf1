@@ -16,5 +16,16 @@
       "database_id": "0085f3dd-6c3e-46e2-93bf-22dc23481e6f"
     }
   ],
+  // GreenVoice link: results go to GreenVoice over this service binding (README, "GreenVoice link").
+  "services": [
+    { "binding": "GREENVOICE", "service": "greenvoice" }
+  ],
+  "vars": {
+    "GREENVOICE_URL": "https://greenvoice.ccistt.net"
+  },
+  // Lists public/recordings/ into public/recordings/index.json on every deploy (README, "Real radio recordings").
+  "build": {
+    "command": "node tools/index-recordings.mjs"
+  },
   "observability": { "enabled": true }
 }

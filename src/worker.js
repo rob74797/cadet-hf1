@@ -1,17 +1,23 @@
 // Cadet HF-1 test site.
 // Serves the radio from /public and keeps three small tables in D1:
 //   feedback  - what testers tell us
-//   attempts  - one row per scored mission, with the cadet's callsign
-//   missions  - missions written in the builder (built-in ones live in the page)
+//   attempts  - one row per scored mission, with the cadet's GreenVoice callsign (or GUEST)
+//   missions  - missions written in the builder by GreenVoice super admins
+// Linked to GreenVoice (README, "GreenVoice link"):
+//   - Cadets log in on GreenVoice's /hf1/ page and come back with a ticket signed with
+//     HF1_KEY, a secret both Workers share. This Worker checks the ticket and passes each
+//     result on to GreenVoice (service binding GREENVOICE, POST /hf1-api/result), so it
+//     reaches the cadet's instructor on the GreenVoice admin page.
+//   - Super admins open the builder from the GreenVoice admin page with a builder token,
+//     also signed with HF1_KEY. The ADMIN_KEY secret still works as a fallback.
 // Testers can add feedback and attempts and read active missions.
-// Everything else needs the ADMIN_KEY secret.
 
-const BUILTIN_MISSIONS = new Set(['foundation40', 'rit', 'beacon', 'data']);
+const BUILTIN_MISSIONS = new Set(); // every mission now comes from the builder
+const DEFAULT_GV = 'https://greenvoice.ccistt.net';
 const ROLES = new Set(['cadet', 'instructor', 'other']);
 const MAX_BODY = 12 * 1024;
 const MAX_MISSION = 420 * 1024; // room for a recorded voice message
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
-const CALL_RE = /^[A-Z0-9/]{2,10}$/;
 
 export default {
   async fetch(request, env) {
@@ -34,15 +40,18 @@ async function api(request, env, url) {
   const m = request.method;
   if (m === 'POST' && pathname === '/api/feedback') return addFeedback(request, env);
   if (m === 'POST' && pathname === '/api/attempt') return addAttempt(request, env);
+  if (m === 'POST' && pathname === '/api/attempt/forward') return forwardOnly(request, env);
   if (m === 'GET' && pathname === '/api/missions') return listMissions(env);
+  if (m === 'GET' && pathname === '/api/config') return json({ greenvoice: gvUrl(env), linked: !!(await hmacKey(env)) });
   if (pathname.startsWith('/api/admin/')) {
-    if (!(await isAdmin(request, env))) {
+    const who = await isAdmin(request, env);
+    if (!who) {
       await new Promise(r => setTimeout(r, 400)); // slow down guessing
       return json({ error: 'unauthorised' }, 401);
     }
     if (m === 'GET' && pathname === '/api/admin/data') return adminData(env, url);
-    if (m === 'GET' && pathname === '/api/admin/check') return json({ ok: true });
-    if (m === 'POST' && pathname === '/api/admin/missions') return saveMission(request, env);
+    if (m === 'GET' && pathname === '/api/admin/check') return json({ ok: true, who: who.email || null });
+    if (m === 'POST' && pathname === '/api/admin/missions') return saveMission(request, env, who);
     if (m === 'POST' && pathname === '/api/admin/missions/active') return setActive(request, env);
     if (m === 'DELETE' && pathname === '/api/admin/missions') return deleteMission(env, url);
   }
@@ -76,30 +85,90 @@ async function addFeedback(request, env) {
   return json({ ok: true });
 }
 
-async function missionExists(env, id) {
-  if (BUILTIN_MISSIONS.has(id)) return true;
-  if (!ID_RE.test(id)) return false;
-  const row = await env.DB.prepare('SELECT id FROM missions WHERE id = ?').bind(id).first();
-  return !!row;
+async function missionRow(env, id) {
+  if (!ID_RE.test(id)) return null;
+  return await env.DB.prepare('SELECT id, title FROM missions WHERE id = ?').bind(id).first();
+}
+
+// ---- GreenVoice link -------------------------------------------------------
+// Tickets and builder tokens are made by GreenVoice (src/hf1-api.js there) and
+// checked here with the same shared secret. "hf1:" = cadet ticket, "hf1b:" = builder.
+const gvUrl = env => { const u = String(env.GREENVOICE_URL || DEFAULT_GV).replace(/\/+$/, ''); return /^https:\/\/[a-z0-9.-]+$/i.test(u) ? u : DEFAULT_GV; };
+const unb64u = s => { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; };
+let keyCache = { secret: null, key: null };
+async function hmacKey(env) {
+  const secret = env.HF1_KEY;
+  if (!secret || String(secret).length < 16) return null;
+  if (keyCache.secret !== secret) keyCache = { secret, key: crypto.subtle.importKey('raw', new TextEncoder().encode(String(secret)), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']) };
+  return keyCache.key;
+}
+async function verifyToken(env, prefix, token) {
+  try {
+    const k = await hmacKey(env);
+    if (!k || typeof token !== 'string' || token.length > 1024) return null;
+    const dot = token.indexOf('.');
+    if (dot < 1) return null;
+    const body = token.slice(0, dot);
+    const ok = await crypto.subtle.verify('HMAC', k, unb64u(token.slice(dot + 1)), new TextEncoder().encode(prefix + body));
+    if (!ok) return null;
+    const t = JSON.parse(new TextDecoder().decode(unb64u(body)));
+    return t && t.v === 1 && t.exp > Date.now() ? t : null;
+  } catch { return null; }
+}
+async function toGreenVoice(env, path, body) {
+  const init = { method: 'POST', headers: { 'content-type': 'application/json', 'x-hf1-key': String(env.HF1_KEY || '') }, body: JSON.stringify(body) };
+  try {
+    const r = env.GREENVOICE ? await env.GREENVOICE.fetch(new Request('https://greenvoice' + path, init)) : await fetch(gvUrl(env) + path, init);
+    const d = await r.json().catch(() => ({}));
+    return { status: r.status, d };
+  } catch (err) { console.error('greenvoice call failed', err); return { status: 0, d: {} }; }
+}
+// What the page needs to know: sent, or why not and whether to try again later.
+function sendResult(x) {
+  if (x.status === 200 && x.d.ok) return { sent: true, to: x.d.to || null };
+  const retry = x.status === 0 || x.status === 429 || x.status >= 500;
+  const reason = x.d.reason === 'callsign' ? 'callsign' : x.d.reason === 'ticket' ? 'login' : retry ? 'later' : 'refused';
+  return { sent: false, retry, reason };
+}
+function resultFor(b, t, row) {
+  return {
+    ticket: b.ticket, attemptId: str(b.attemptId, 64), mission: row.id, title: row.title,
+    points: int(b.points, 0, 200), max: int(b.max, 0, 200), passed: !!b.passed, licence: !!b.licence, secs: int(b.secs, 0, 86400),
+  };
 }
 
 async function addAttempt(request, env) {
   const b = await readBody(request);
   if (!b || typeof b.mission !== 'string') return json({ error: 'bad_request' }, 400);
-  const call = normCall(b.callsign || b.tester);
-  if (!CALL_RE.test(call)) return json({ error: 'bad_callsign' }, 400);
-  if (!(await missionExists(env, b.mission))) return json({ error: 'unknown_mission' }, 400);
+  const row = await missionRow(env, b.mission);
+  if (!row) return json({ error: 'unknown_mission' }, 400);
+  const t = b.ticket ? await verifyToken(env, 'hf1:', b.ticket) : null;
+  const call = t ? normCall(t.cs) : 'GUEST';
   const rules = Array.isArray(b.rules)
     ? b.rules.slice(0, 30).map(r => ({ id: str(r && r.id, 24), ok: !!(r && r.ok) }))
     : [];
   await env.DB.prepare(
     'INSERT INTO attempts (at, version, tester, mission, points, max_points, passed, licence_fail, rules, txs, changes, secs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind(
-    new Date().toISOString(), str(b.v, 20), call, b.mission,
+    new Date().toISOString(), str(b.v, 20), call, row.id,
     int(b.points, 0, 200), int(b.max, 0, 200), b.passed ? 1 : 0, b.licence ? 1 : 0,
     JSON.stringify(rules), int(b.txs, 0, 1000), int(b.changes, 0, 10000), int(b.secs, 0, 86400)
   ).run();
-  return json({ ok: true });
+  if (!t) return json({ ok: true, sent: false, reason: b.ticket ? 'login' : 'guest' });
+  if (!/^[a-z0-9-]{8,64}$/i.test(str(b.attemptId, 64))) return json({ ok: true, sent: false, reason: 'refused' });
+  return json(Object.assign({ ok: true }, sendResult(await toGreenVoice(env, '/hf1-api/result', resultFor(b, t, row)))));
+}
+
+// A result the phone kept because GreenVoice couldn't be reached: send it on, don't count it again here.
+async function forwardOnly(request, env) {
+  const b = await readBody(request);
+  if (!b || typeof b.mission !== 'string') return json({ error: 'bad_request' }, 400);
+  const row = await missionRow(env, b.mission);
+  if (!row) return json({ ok: true, sent: false, retry: false, reason: 'refused' });
+  const t = await verifyToken(env, 'hf1:', b.ticket);
+  if (!t) return json({ ok: true, sent: false, retry: false, reason: 'login' });
+  if (!/^[a-z0-9-]{8,64}$/i.test(str(b.attemptId, 64))) return json({ ok: true, sent: false, retry: false, reason: 'refused' });
+  return json(Object.assign({ ok: true }, sendResult(await toGreenVoice(env, '/hf1-api/result', resultFor(b, t, row)))));
 }
 
 async function listMissions(env) {
@@ -170,6 +239,7 @@ function cleanMission(b) {
     question: str(b.question, 200) || undefined,
     answerHash: /^[0-9a-f]{64}$/.test(b.answerHash || '') ? b.answerHash : undefined,
     path: b.path ? int(b.path, 100, 170) : undefined,
+    by: str(b.by, 120) || undefined,
     builder: b.builder && typeof b.builder === 'object' ? b.builder : undefined,
   };
   const text = JSON.stringify(data);
@@ -177,9 +247,10 @@ function cleanMission(b) {
   return { id, title, text };
 }
 
-async function saveMission(request, env) {
+async function saveMission(request, env, who) {
   const b = await readBody(request, MAX_MISSION + 4096);
   if (!b) return json({ error: 'bad_request' }, 400);
+  if (who && who.email) b.by = who.email;
   const m = cleanMission(b);
   if (m.error) return json({ error: m.error }, 400);
   await env.DB.prepare(
@@ -210,10 +281,16 @@ async function adminData(env, url) {
   return json({ feedback: fb.results, attempts: at.results, missions: ms.results });
 }
 
+// A GreenVoice super admin's builder token ("Bearer bt:<token>"), or the ADMIN_KEY secret.
 async function isAdmin(request, env) {
   const auth = request.headers.get('authorization') || '';
   const given = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return !!env.ADMIN_KEY && !!given && (await sameSecret(given, env.ADMIN_KEY));
+  if (!given) return null;
+  if (given.startsWith('bt:')) {
+    const t = await verifyToken(env, 'hf1b:', given.slice(3));
+    return t ? { email: String(t.em || '') } : null;
+  }
+  return env.ADMIN_KEY && (await sameSecret(given, env.ADMIN_KEY)) ? { email: null } : null;
 }
 
 async function sameSecret(a, b) {

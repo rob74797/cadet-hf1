@@ -59,7 +59,9 @@ const BUILT={foundation40:'Foundation licence check',rit:'Drifting station',beac
 const dc=c=>String(c||'').replace(/0/g,'Ø');const nc=c=>String(c||'').toUpperCase().replace(/[ØΦ∅]/g,'0').replace(/[^A-Z0-9/]/g,'');
 let data=null;
 try{$('#key').value=sessionStorage.getItem('hf1key')||'';}catch(e){}
-$('#f').addEventListener('submit',async e=>{e.preventDefault();const k=$('#key').value.trim();$('#msg').textContent='Loading...';
+let BT='';try{BT=sessionStorage.getItem('hf1bt')||'';}catch(e){}
+if(BT){$('#msg').textContent='Signed in from GreenVoice. Press LOAD, or enter the admin key instead.';}
+$('#f').addEventListener('submit',async e=>{e.preventDefault();const k=$('#key').value.trim()||(BT?'bt:'+BT:'');$('#msg').textContent='Loading...';
  try{const r=await fetch('/api/admin/data',{headers:{authorization:'Bearer '+k}});if(r.status===401){$('#msg').textContent='That key is not right. Check the ADMIN_KEY secret in Cloudflare.';return;}if(!r.ok)throw new Error(r.status);data=await r.json();try{sessionStorage.setItem('hf1key',k);}catch(e){}draw();}
  catch(err){$('#msg').textContent='Could not load results ('+err.message+'). Check the site is deployed and the database is connected.';}});
 function draw(){const F=data.feedback,A=data.attempts,M=data.missions||[];NAMES=Object.assign({},BUILT);M.forEach(m=>NAMES[m.id]=m.title);$('#msg').textContent='Showing the latest '+F.length+' feedback entries and '+A.length+' mission attempts.';
@@ -78,7 +80,7 @@ function drawWho(){const A=data.attempts;const q=nc($('#flt').value);const mids=
 $('#flt').addEventListener('input',()=>{if(data)drawWho();});
 function drawMl(){const M=data.missions||[];$('#mlt').innerHTML='<tr><th>MISSION</th><th>CHECKS</th><th>LAST SAVED</th><th>SHOWN TO TESTERS</th><th></th></tr>'+M.map(m=>{let d={};try{d=JSON.parse(m.data);}catch(e){}return'<tr><td>'+esc(m.title)+'<br><span style="color:var(--muted);font-size:12px">'+esc(m.id)+'</span></td><td class="n">'+((d.rules||[]).length)+'</td><td class="n">'+esc(String(m.updated).slice(0,16).replace('T',' '))+'</td><td><button type="button" class="q" data-act="'+(m.active?'off':'on')+'" data-id="'+esc(m.id)+'">'+(m.active?'ON · HIDE IT':'OFF · SHOW IT')+'</button></td><td><button type="button" class="q" data-act="del" data-id="'+esc(m.id)+'">DELETE</button></td></tr>';}).join('');$('#mlist').hidden=false;}
 let delArm='';
-$('#mlt').addEventListener('click',async e=>{const b=e.target.closest('button[data-act]');if(!b)return;const id=b.dataset.id,act=b.dataset.act,k=$('#key').value.trim();
+$('#mlt').addEventListener('click',async e=>{const b=e.target.closest('button[data-act]');if(!b)return;const id=b.dataset.id,act=b.dataset.act,k=$('#key').value.trim()||(BT?'bt:'+BT:'');
  if(act==='del'&&delArm!==id){delArm=id;b.textContent='TAP AGAIN TO DELETE';setTimeout(()=>{if(delArm===id){delArm='';b.textContent='DELETE';}},4000);return;}
  try{const r=act==='del'?await fetch('/api/admin/missions?id='+encodeURIComponent(id),{method:'DELETE',headers:{authorization:'Bearer '+k}}):await fetch('/api/admin/missions/active',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+k},body:JSON.stringify({id,active:act==='on'})});if(!r.ok)throw new Error(r.status);delArm='';$('#f').requestSubmit();}
  catch(err){$('#msg').textContent='That change did not save ('+err.message+').';}});

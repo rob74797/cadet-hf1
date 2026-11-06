@@ -74,15 +74,25 @@ On the test site the radio uses the cadet's **microphone** by default. The first
 - A **time-out timer** stops any transmission after 60 seconds, as real radios do, so a stuck PTT or VOX can't block the channel.
 - While the radio is on, the phone screen is kept awake. Switching apps stops any transmission, and the sound and mic recover when you come back.
 
-## Callsigns
+## GreenVoice link
 
-Before a scored mission, the cadet enters their callsign. It's shown with Ø the way cadets write zero, and stored with a plain 0 so the same callsign always matches. The results page has a **Who has passed** grid with one row per callsign and one column per mission, plus a search box.
+Cadets log in with their **GreenVoice callsign**, their results go to **the instructor who issued that callsign** on the GreenVoice admin page, and **GreenVoice super admins** set up the missions. The GreenVoice side, including its setup steps, is in the GreenVoice repo, `src/CADET_HF1_LINK.md`.
 
-Callsigns are typed by the cadet, not checked against an account. A mistyped callsign shows up as its own row, and someone could type another cadet's callsign. Verified results arrive with GreenVoice sign-in.
+- **Logging in:** the top bar shows **LOG IN**. It opens the station log, where **LOG IN WITH GREENVOICE** goes to GreenVoice's `/hf1/` page.
+  - On a phone that already uses GreenVoice, the cadet comes straight back logged in, with nothing to type.
+  - Otherwise they type the callsign and code from their slip on GreenVoice's page. HF-1 only ever learns the callsign.
+  - The login lasts up to two weeks, and every result is re-checked by GreenVoice.
+- **Without logging in**, missions run as practice: they're scored as normal but not sent to an instructor.
+- **Results:** each finished mission goes to GreenVoice (service binding `GREENVOICE`, with the shared secret `HF1_KEY`). The result screen says **✓ Sent to <instructor>**. If GreenVoice can't be reached, or the login has run out, the phone keeps the result and sends it by itself later.
+- **This Worker's own results page** (`/admin.html`) still shows every attempt, including practice ones (as `GUEST`), for pass rates and the most-missed checks.
+
+**Setup on this side:** add a secret `HF1_KEY` to the `cadet-hf1` Worker (**Workers & Pages → cadet-hf1 → Settings → Variables and Secrets → Add**, type **Secret**), with the same value as GreenVoice's. `wrangler.jsonc` already has the `GREENVOICE` service binding and `GREENVOICE_URL`.
 
 ## Building missions
 
-Open the radio with `?builder` on the end of the address (for example `https://hf1.ccistt.net/?builder`) and press **BUILDER**.
+GreenVoice super admins open the builder from the GreenVoice admin page: **Cadets tab → Cadet HF-1 missions → Open the mission builder**. HF-1 opens in a new tab with **BUILDER** in the top bar, signed in as them for 8 hours. (Fallback: add `?builder` to the address and type this Worker's admin key into the builder.)
+
+There are no built-in missions: cadets see Free play plus whatever you've saved.
 
 1. **Details:** a title, the brief the cadet reads, and optionally a question with its answer.
 2. **Starting state:** choose **Set it up on the radio**, put the radio how the cadet should find it (wrong, usually), and press **CAPTURE START**.
@@ -116,7 +126,7 @@ Open the radio with `?builder` on the end of the address (for example `https://h
    - every check is an exact match
    - the station they must tune onto sits outside the dial's band bank
 
-Press **TEST AS CADET** to try it; test attempts are not saved. Enter the admin key and press **SAVE MISSION**. Testers see it the next time they open MISSIONS. **LOAD SAVED** brings a mission back to edit. On the results page you can hide, show or delete built missions.
+Press **TEST AS CADET** to try it; test attempts are not saved or sent. Press **SAVE MISSION**; it records which super admin saved it. Testers see it the next time they open MISSIONS. **LOAD SAVED** brings a mission back to edit. On the results page you can hide, show or delete built missions.
 
 Answers to questions are stored as a fingerprint (a SHA-256 hash), so they can't be read from the page. Scoring runs in the cadet's browser, which is fine for testing but not tamper-proof.
 
@@ -127,11 +137,23 @@ Answers to questions are stored as a fingerprint (a SHA-256 hash), so they can't
 - The form asks testers not to include personal details.
 
 **Mission attempts**
-- Stored: the callsign the cadet entered, the mission, the score, which checks passed, and the time taken.
+- Stored here: the cadet's GreenVoice callsign (or `GUEST` for practice), the mission, the score, which checks passed, and the time taken.
+- Sent to GreenVoice for logged-in cadets: the callsign, mission, score, pass or fail, licence breach and time taken. GreenVoice stores it against the issuing instructor and deletes it with the callsign in its data retention purge.
 
 **Not stored:** IP addresses, accounts, or anything that sticks around on the tester's device apart from the radio's own station log.
 
 **Clearing the data:** open the D1 Console and run `DELETE FROM feedback; DELETE FROM attempts;`. It's worth setting a retention period for the test phase.
+
+## Real radio recordings
+
+Put recordings of real radio traffic in `public/recordings/` (on GitHub: open that folder, **Add file → Upload files**). On the next deploy they are listed automatically, and the radio puts them on the air alongside its computer voices. Some computer voices are swapped for real ones, and extra stations are added in the phone segment when a band has more recordings than voices. The mistuning, sideband and filter effects work on them exactly as on the computer voices.
+
+- MP3, M4A, AAC, WAV, OGG, Opus, WebM or FLAC, up to 8 MB and 45 seconds each, up to 40 files.
+- Start the name with a band to put it there, for example `40m-net-control.mp3`. Other names go where there are fewest.
+- Free play's brief says how many real recordings are on the air, so you can check they loaded.
+- `public/recordings/README.md` has the details. The listing is made by `tools/index-recordings.mjs`, which `wrangler.jsonc` runs on each deploy.
+
+**This repository is public**, so anything in it, recordings included, can be downloaded by anyone. Before adding recordings with real callsigns, consider making it private (GitHub → Settings → General → Danger zone → Change visibility). Cloudflare's GitHub connection keeps working.
 
 ## Updating the radio
 
